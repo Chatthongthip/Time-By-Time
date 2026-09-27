@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+body {
+    font-family: 'Sarabun', sans-serif;
+}
+
+.capsule-btn {
+    background-color: #e0d8c7;
+    color: #1f3627;
+    transition: all 0.2s ease;
+}
+
+.capsule-btn:hover {
+    background-color: #c0b59f;
+}
+
+.capsule-btn.active {
+    background-color: #385441;
+    color: #ffffff;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c0b59f;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #385441;
+}
