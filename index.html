@@ -64,6 +64,9 @@
                     <button onclick="app.addNewGroupBoard()" class="px-2.5 py-1.5 bg-[#e0d8c7] text-[#1f3627] hover:bg-[#c0b59f] rounded-lg text-xs font-bold flex items-center gap-1">
                         <i class="fa-solid fa-plus"></i> กลุ่มใหม่
                     </button>
+                    <button onclick="app.deleteGroupBoard()" class="px-2.5 py-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-xs font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-trash"></i> ลบกลุ่ม
+                    </button>
                 </div>
                 <div class="flex items-center space-x-2">
                     <button onclick="app.openTaskModal()" class="px-3.5 py-1.5 bg-[#385441] text-white hover:bg-[#2d4735] rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5">
@@ -95,7 +98,7 @@
                         <h3 class="text-xs font-bold text-[#1f3627] flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-emerald-500"></span> เสร็จแล้ว (Done)
                         </h3>
-                        <span id="badge-done" class="text-[10px] bg-white text-[#1f3627] font-bold px-2 py-0.5 rounded-full border border-[#c0b59f]">0</span>
+                      <span id="badge-done" class="text-[10px] bg-white text-[#1f3627] font-bold px-2 py-0.5 rounded-full border border-[#c0b59f]">0</span>
                     </div>
                     <div id="col-done" class="flex-1 space-y-2.5 overflow-y-auto pr-1"></div>
                 </div>
@@ -105,15 +108,15 @@
             <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-[#c0b59f] shadow-sm">
                 <div class="flex items-center space-x-3">
                     <h2 id="calendar-month-year" class="text-sm font-bold text-[#1f3627]">เดือน และ ปี</h2>
-                    <button onclick="app.goToday()" class="text-xs bg-[#e0d8c7] px-2.5 py-1 rounded-lg font-medium text-[#1f3627] hover:bg-[#c0b59f]">
+                    <button type="button" onclick="app.goToday()" class="text-xs bg-[#e0d8c7] px-2.5 py-1 rounded-lg font-medium text-[#1f3627] hover:bg-[#c0b59f]">
                         วันนี้
                     </button>
                 </div>
                 <div class="flex items-center space-x-1">
-                    <button onclick="app.changeMonth(-1)" class="p-1.5 rounded-lg border border-[#c0b59f] hover:bg-gray-100 text-xs text-[#1f3627]">
+                    <button type="button" onclick="app.changeMonth(-1)" class="p-1.5 rounded-lg border border-[#c0b59f] hover:bg-gray-100 text-xs text-[#1f3627]">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
-                    <button onclick="app.changeMonth(1)" class="p-1.5 rounded-lg border border-[#c0b59f] hover:bg-gray-100 text-xs text-[#1f3627]">
+                    <button type="button" onclick="app.changeMonth(1)" class="p-1.5 rounded-lg border border-[#c0b59f] hover:bg-gray-100 text-xs text-[#1f3627]">
                         <i class="fa-solid fa-chevron-right"></i>
                     </button>
                 </div>
@@ -153,11 +156,12 @@
         <section id="view-team" class="hidden space-y-4 max-w-2xl mx-auto">
             <div class="glass-panel p-5 rounded-2xl border border-[#c0b59f]/50 shadow-sm space-y-3">
                 <h3 class="text-xs font-bold text-[#1f3627]"><i class="fa-solid fa-user-plus mr-1.5"></i>เพิ่มเพื่อนใหม่เข้าสู่ระบบ</h3>
-                <p class="text-[10px] text-gray-500">เพิ่มได้เฉพาะบัญชีที่สมัครสมาชิกแล้วเท่านั้น</p>
+                <p class="text-[10px] text-gray-500">ใส่ <b>อีเมลที่เพื่อนใช้สมัครในแอปนี้แล้ว</b> ไม่ใช่ไอจี และเพื่อนต้องสมัครบนเบราว์เซอร์นี้ก่อน</p>
                 <form onsubmit="app.handleAddFriend(event)" class="flex gap-2">
-                    <input type="email" id="friend-email-input" required placeholder="กรอกอีเมลเพื่อน เช่น friend@domain.com" class="flex-1 text-xs border border-[#c0b59f] rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
+                    <input type="text" id="friend-email-input" placeholder="อีเมลที่เพื่อนสมัครแล้ว เช่น friend@email.com" class="flex-1 text-xs border border-[#c0b59f] rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                     <button type="submit" class="px-4 py-2 bg-[#385441] text-white rounded-xl text-xs font-bold hover:bg-[#2d4735]">เพิ่มเพื่อน</button>
                 </form>
+                <div id="local-accounts-list" class="text-[10px] text-gray-600"></div>
             </div>
             <div class="glass-panel p-5 rounded-2xl border border-[#c0b59f]/50 shadow-sm space-y-3">
                 <h3 class="text-xs font-bold text-[#1f3627]"><i class="fa-solid fa-user-clock mr-1.5"></i>คำขอเป็นเพื่อน</h3>
@@ -282,14 +286,22 @@
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">ชื่อ *</label>
                     <input type="text" id="auth-name" placeholder="ชื่อของคุณ" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
+                <div id="auth-username-box" class="hidden">
+                    <label class="block text-[11px] font-bold text-[#1f3627] mb-1">ไอจี / ชื่อผู้ใช้ (ไม่บังคับ)</label>
+                    <input type="text" id="auth-username" placeholder="@username" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
+                </div>
                 <div>
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">อีเมล *</label>
-                    <input type="email" id="auth-email" placeholder="name@example.com" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
+                    <input type="text" id="auth-email" placeholder="name@example.com" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">รหัสผ่าน *</label>
                     <input type="password" id="auth-password" placeholder="••••••••" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
+                <label class="flex items-center gap-2 text-[11px] text-[#1f3627]">
+                    <input type="checkbox" id="auth-remember" checked>
+                    จดจำการเข้าสู่ระบบบนเครื่องนี้
+                </label>
                 <button type="button" id="auth-submit-btn" onclick="app.doLogin()" class="w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold hover:bg-[#2d4735] shadow-sm">
                     เข้าสู่ระบบ
                 </button>
@@ -309,8 +321,16 @@
                 </div>
             </form>
             <p id="auth-switch-text" class="text-center text-xs text-gray-500">
-                กรอกข้อมูลแล้วกดปุ่มด้านบนตามต้องการ
+                อัปเดตโค้ดไม่ลบบัญชี ถ้าเปิดไฟล์เดิมบนเบราว์เซอร์เดิม
             </p>
+            <div id="saved-accounts-box" class="text-[10px] text-gray-600 text-center"></div>
+            <div class="flex gap-2">
+                <button type="button" onclick="app.exportBackup()" class="flex-1 py-2 border border-[#c0b59f] rounded-xl text-[10px] font-bold text-[#1f3627]">สำรองข้อมูล</button>
+                <label class="flex-1 py-2 bg-[#e0d8c7] rounded-xl text-[10px] font-bold text-[#1f3627] text-center cursor-pointer">
+                    กู้คลังบัญชี
+                    <input type="file" accept="application/json,.json,.js,text/javascript" class="hidden" onchange="app.importBackup(event)">
+                </label>
+            </div>
         </div>
     </div>
     <div id="profile-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -327,6 +347,13 @@
                 </div>
                 <h4 id="profile-modal-name" class="text-xs font-bold text-[#1f3627]">-</h4>
                 <p id="profile-modal-email" class="text-[10px] text-gray-500">-</p>
+                <div class="flex gap-2 justify-center mt-2">
+                    <button type="button" onclick="app.exportBackup()" class="px-3 py-1.5 border border-[#c0b59f] rounded-lg text-[10px] font-bold">สำรองข้อมูล</button>
+                    <label class="px-3 py-1.5 bg-[#e0d8c7] rounded-lg text-[10px] font-bold cursor-pointer">
+                        กู้ข้อมูลกลับ
+                        <input type="file" accept="application/json,.json" class="hidden" onchange="app.importBackup(event)">
+                    </label>
+                </div>
             </div>
             <div class="space-y-2">
                 <h4 class="text-xs font-bold text-[#1f3627] flex items-center gap-1.5">
@@ -340,6 +367,7 @@
     <div id="toast" class="hidden fixed bottom-5 right-5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium z-50 transition-all duration-300"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="tb-cloud.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
