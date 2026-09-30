@@ -149,12 +149,17 @@ class App {
         this.loadCurrentUser();
         this.checkAuth();
         if (this.currentUser) {
-            this.renderKanban();
-            this.renderCalendar();
-            this.updateGroupSelectOptions();
-            this.renderFriendsList();
-            this.updateProfileBadge();
-            this.updateUserProfileUI();
+            try {
+                this.renderKanban();
+                this.renderCalendar();
+                this.updateGroupSelectOptions();
+                this.renderFriendsList();
+                this.updateProfileBadge();
+                this.updateUserProfileUI();
+            } catch (err) {
+                console.error(err);
+                this.showToast('โหลดข้อมูลไม่สำเร็จ แต่ยังล็อกอินได้', 'warning');
+            }
         }
     }
 
@@ -212,15 +217,25 @@ class App {
 
     doLogin() {
         this.authMode = 'login';
+        var nameBox = document.getElementById('auth-name-box');
+        if (nameBox) nameBox.classList.add('hidden');
+        var title = document.getElementById('auth-title');
+        if (title) title.innerText = 'เข้าสู่ระบบ TimeByTime';
         this.handleAuthSubmit();
     }
 
     doRegister() {
         this.authMode = 'register';
         var nameBox = document.getElementById('auth-name-box');
-        if (nameBox) nameBox.classList.remove('hidden');
+        var nameEl = document.getElementById('auth-name');
         var title = document.getElementById('auth-title');
         if (title) title.innerText = 'สมัครสมาชิก TimeByTime';
+        if (nameBox) nameBox.classList.remove('hidden');
+        if (!nameEl || !String(nameEl.value || '').trim()) {
+            this.showToast('กรอกชื่อ แล้วกดสมัครสมาชิกอีกครั้ง', 'warning');
+            if (nameEl) nameEl.focus();
+            return;
+        }
         this.handleAuthSubmit();
     }
 
@@ -389,8 +404,10 @@ class App {
         var users = this.getUsers();
         var ok = false;
         for (var i = 0; i < users.length; i++) {
-            if (users[i].email === this.resetEmail) { users[i].password = p1;
-                ok = true; }
+            if (users[i].email === this.resetEmail) {
+                users[i].password = p1;
+                ok = true;
+            }
         }
         if (!ok || !this.saveUsers(users)) return this.showToast('บันทึกรหัสไม่สำเร็จ', 'error');
         var resets = {};
@@ -503,14 +520,22 @@ class App {
         this.showToast('ลบเพื่อนแล้ว', 'info');
     }
     renderFriendsList() {
-        const list = document.getElementById('friends-list');
-        if (list) {
-            const friends = this.getFriends();
-            list.innerHTML = friends.length ? friends.map(email => `
-                <div class="flex items-center justify-between p-2.5 bg-white/70 rounded-xl border border-[#c0b59f]/60">
-                    <span class="text-xs font-semibold text-[#1f3627]">${this.escapeHtml(email)}</span>
-                    <button onclick="app.removeFriend('${email}')" class="text-xs text-red-600 font-bold px-2">ลบ</button>
-                </div>`).join('') : '<div class="text-xs text-gray-600 py-3 text-center">ยังไม่มีเพื่อน</div>';
+        var list = document.getElementById('friends-list');
+        if (list && this.currentUser) {
+            var friends = this.getFriends();
+            if (!friends.length) {
+                list.innerHTML = '<div class="text-xs text-gray-600 py-3 text-center">ยังไม่มีเพื่อน</div>';
+            } else {
+                var html = '';
+                for (var i = 0; i < friends.length; i++) {
+                    var email = String(friends[i]);
+                    html += '<div class="flex items-center justify-between p-2.5 bg-white/70 rounded-xl border border-[#c0b59f]/60">' +
+                        '<span class="text-xs font-semibold text-[#1f3627]">' + this.escapeHtml(email) + '</span>' +
+                        '<button type="button" onclick="app.removeFriend(\'' + this.escapeHtml(email) + '\')" class="text-xs text-red-600 font-bold px-2">ลบ</button>' +
+                        '</div>';
+                }
+                list.innerHTML = html;
+            }
         }
         this.renderFriendRequests();
         this.renderTeamInvitations();
@@ -582,8 +607,10 @@ class App {
     respondInvitation(id, status) {
         const invites = this.getInvitations();
         const i = invites.findIndex(x => x.id === id);
-        if (i !== -1) { invites[i].status = status;
-            this.saveInvitations(invites); }
+        if (i !== -1) {
+            invites[i].status = status;
+            this.saveInvitations(invites);
+        }
         this.renderProfileInvitations();
         this.updateProfileBadge();
         this.renderKanban();
@@ -690,8 +717,10 @@ class App {
             if (modal) modal.appendChild(new Option(g, g));
         });
     }
-    handleGroupChange(v) { this.activeGroup = v;
-        this.renderKanban(); }
+    handleGroupChange(v) {
+        this.activeGroup = v;
+        this.renderKanban();
+    }
     addNewGroupBoard() {
         const name = prompt('ชื่อบอร์ดกลุ่มใหม่:');
         if (!name || !String(name).trim()) return;
@@ -793,7 +822,19 @@ class App {
         var scanText = this.pendingScanText || (oldTask && oldTask.scanText) || '';
         var scanFile = this.pendingScanFile || (oldTask && oldTask.scanFile) || '';
         const data = { title, startDate, dueDate, time: '', location: '', priority, status, type, userEmail, boardName, taggedEmails: this.currentTaskMembers, useAI, scanUrl, scanText, scanFile };
+        if (!startDate && !dueDate) {
+            var now = new Date();
+            dueDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            this.showToast('ไม่ได้ใส่วันที่ ระบบใส่เป็นวันนี้ให้แล้ว', 'warning');
+        }
+        data.startDate = startDate;
+        data.dueDate = dueDate;
         let taskObj = type === 'group' ? new GroupTask(data) : new PersonalTask(data);
+        taskObj.startDate = startDate || '';
+        taskObj.dueDate = dueDate || '';
+        taskObj.scanUrl = scanUrl;
+        taskObj.scanText = scanText;
+        taskObj.scanFile = scanFile;
         taskObj.dailyPlans = (useAI && startDate && dueDate) ? AIScheduler.createDailyPlans(taskObj) : [];
         if (useAI && startDate && dueDate) this.showToast('AI กำลังจัดสรรวัน...', 'info');
 
@@ -854,8 +895,12 @@ class App {
 
     pullUpNextTasks(completed, allTasks, daysEarly) {
         if (!daysEarly || daysEarly <= 0) return allTasks;
-        const shift = (d) => { if (!d) return d; const x = new Date(d);
-            x.setDate(x.getDate() - daysEarly); return x.toISOString().slice(0, 10); };
+        const shift = (d) => {
+            if (!d) return d;
+            const x = new Date(d);
+            x.setDate(x.getDate() - daysEarly);
+            return x.toISOString().slice(0, 10);
+        };
         return allTasks.map(t => {
             if (t.id === completed.id || t.status === 'done' || !(t.startDate || t.dueDate)) return t;
             const u = {...t };
@@ -1013,47 +1058,72 @@ class App {
         title.innerText = names[m] + ' ' + (y + 543);
         const first = new Date(y, m, 1).getDay(),
             days = new Date(y, m + 1, 0).getDate();
-        const today = new Date();
-        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         for (let i = 0; i < first; i++) {
             const e = document.createElement('div');
-            e.className = 'min-h-[92px] rounded-lg bg-black/10';
+            e.className = 'h-24 rounded-xl bg-white/25 border border-white/30';
             grid.appendChild(e);
         }
         const userEmail = this.currentUser.email;
         const tasks = this.getTasks().filter(function(t) {
             return t.userEmail === userEmail || (t.taggedEmails || []).indexOf(userEmail) !== -1;
         });
-        const clean = function(v) { return String(v || '').trim().slice(0, 10); };
+        const clean = function(v) {
+            var s = String(v || '').trim();
+            var m1 = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m1) return m1[1] + '-' + String(m1[2]).padStart(2, '0') + '-' + String(m1[3]).padStart(2, '0');
+            return s.slice(0, 10);
+        };
         const self = this;
+        var shown = 0;
         for (let d = 1; d <= days; d++) {
             const cell = document.createElement('div');
-            cell.className = 'min-h-[92px] rounded-lg bg-black/55 border border-white/10 p-1 space-y-1';
+            cell.className = 'h-24 bg-white/45 p-2 rounded-xl border border-white/50 overflow-y-auto space-y-1';
             const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-            const num = document.createElement('div');
-            num.className = 'text-[11px] font-bold text-white text-right';
-            num.innerHTML = ds === todayStr ? '<span class="inline-flex w-5 h-5 items-center justify-center rounded-full bg-red-600">' + d + '</span>' : String(d);
-            cell.appendChild(num);
+            cell.innerHTML = '<div class="text-xs font-bold text-[#1f3627] mb-1">' + d + '</div>';
             tasks.forEach(function(t) {
                 var start = clean(t.startDate) || clean(t.dueDate);
                 var due = clean(t.dueDate) || clean(t.startDate);
+                if (start && due && start > due) {
+                    var tmp = start;
+                    start = due;
+                    due = tmp;
+                }
                 var planHit = (t.dailyPlans || []).find(function(p) { return clean(p.date) === ds; });
                 if (!(start && due && ds >= start && ds <= due) && !planHit) return;
+                shown++;
                 const el = document.createElement('div');
-                el.className = 'text-[9px] text-white p-1 rounded truncate cursor-pointer';
-                el.style.background = t.type === 'group' ? '#7c3aed' : '#2563eb';
-                el.innerText = (t.type === 'group' ? 'กลุ่ม ' : '') + ((planHit && planHit.description) ? planHit.description : t.title);
-                el.onclick = function(ev) { ev.stopPropagation();
-                    self.openEditTaskModal(t.id); };
+                el.className = 'text-[9px] bg-[#385441] text-white px-1.5 py-0.5 rounded truncate cursor-pointer';
+                el.innerText = (planHit && planHit.description) ? planHit.description : t.title;
+                el.onclick = function(ev) {
+                    ev.stopPropagation();
+                    self.openEditTaskModal(t.id);
+                };
                 cell.appendChild(el);
             });
             grid.appendChild(cell);
         }
+        var note = document.getElementById('calendar-miss-note');
+        if (!note) {
+            note = document.createElement('div');
+            note.id = 'calendar-miss-note';
+            note.className = 'text-[11px] text-[#1f3627] bg-white/70 rounded-xl p-2';
+            grid.parentNode.appendChild(note);
+        }
+        if (!tasks.length) note.innerText = 'ยังไม่มีงานในบัญชีนี้';
+        else if (!shown) {
+            note.innerText = 'เดือนนี้ไม่มีงาน งานที่มีอยู่: ' + tasks.map(function(t) {
+                return t.title + ' (' + (clean(t.dueDate) || clean(t.startDate) || 'ไม่ได้ใส่วันที่') + ')';
+            }).join(' | ');
+        } else note.innerText = '';
     }
-    changeMonth(off) { this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + off);
-        this.renderCalendar(); }
-    goToday() { this.currentCalendarDate = new Date();
-        this.renderCalendar(); }
+    changeMonth(off) {
+        this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + off);
+        this.renderCalendar();
+    }
+    goToday() {
+        this.currentCalendarDate = new Date();
+        this.renderCalendar();
+    }
 
     setTimerMode(mode) {
         this.timerMode = mode;
@@ -1092,9 +1162,13 @@ class App {
                 self.updateTimerDisplay();
                 return;
             }
-            if (self.timerTimeLeft > 0) { self.timerTimeLeft--;
-                self.updateTimerDisplay(); } else { self.stopTimer();
-                self.showToast('หมดเวลา!', 'warning'); }
+            if (self.timerTimeLeft > 0) {
+                self.timerTimeLeft--;
+                self.updateTimerDisplay();
+            } else {
+                self.stopTimer();
+                self.showToast('หมดเวลา!', 'warning');
+            }
         }, 1000);
     }
     stopTimer() {
@@ -1132,4 +1206,9 @@ class App {
 }
 
 let app;
-window.addEventListener('DOMContentLoaded', () => { app = new App(); });
+window.addEventListener('DOMContentLoaded', function() {
+    try { app = new App(); } catch (err) {
+        console.error(err);
+        alert('สคริปต์เริ่มไม่สำเร็จ: ' + err.message);
+    }
+});

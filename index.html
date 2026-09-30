@@ -12,13 +12,21 @@
     <header class="sticky top-0 z-30 px-4 py-3">
         <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-[#385441] flex items-center justify-center text-white font-bold text-sm shadow-sm">T</div>
+                <div class="w-8 h-8 rounded-lg bg-[#385441] flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                    T
+                </div>
                 <h1 class="text-base font-bold text-[#1f3627] tracking-wide">TimeByTime</h1>
             </div>
             <nav class="flex items-center space-x-2">
-                <button id="nav-kanban" onclick="app.switchView('kanban')" class="active capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-table-columns"></i> บอร์ด</button>
-                <button id="nav-calendar" onclick="app.switchView('calendar')" class="capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5"><i class="fa-regular fa-calendar"></i> ปฏิทิน</button>
-                <button id="nav-pomodoro" onclick="app.switchView('pomodoro')" class="capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5"><i class="fa-solid fa-stopwatch"></i> ตัวจับเวลา</button>
+                <button id="nav-kanban" onclick="app.switchView('kanban')" class="active capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5">
+                    <i class="fa-solid fa-table-columns"></i> บอร์ด
+                </button>
+                <button id="nav-calendar" onclick="app.switchView('calendar')" class="capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5">
+                    <i class="fa-regular fa-calendar"></i> ปฏิทิน
+                </button>
+                <button id="nav-pomodoro" onclick="app.switchView('pomodoro')" class="capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5">
+                    <i class="fa-solid fa-stopwatch"></i> ตัวจับเวลา
+                </button>
                 <button id="nav-team" onclick="app.switchView('team')" class="capsule-btn px-3 py-1.5 text-xs font-bold rounded-lg flex items-center gap-1.5 relative">
                     <i class="fa-solid fa-users"></i> จัดการทีม & เพื่อน
                     <span id="team-request-badge" class="hidden absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center">0</span>
@@ -26,41 +34,70 @@
             </nav>
             <div class="flex items-center space-x-3">
                 <button onclick="app.openProfileModal()" class="flex items-center space-x-2 text-xs font-semibold text-[#1f3627] hover:opacity-80 relative">
-                    <div class="w-7 h-7 rounded-full bg-[#385441] text-white flex items-center justify-center font-bold text-[10px]"><i class="fa-solid fa-user"></i></div>
+                    <div class="w-7 h-7 rounded-full bg-[#385441] text-white flex items-center justify-center font-bold text-[10px]">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
                     <span id="user-display-name">ผู้ใช้</span>
                     <span id="profile-invite-badge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
                 </button>
-                <button onclick="app.handleLogout()" class="text-xs text-red-600 hover:text-red-800 font-medium"><i class="fa-solid fa-right-from-bracket"></i></button>
+                <button onclick="app.handleLogout()" class="text-xs text-red-600 hover:text-red-800 font-medium">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
             </div>
         </div>
     </header>
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6">
         <section id="view-kanban" class="space-y-4">
-            <div class="board-toolbar flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border border-white/30">
-                <div class="flex items-center space-x-2 bg-white/30 p-1 rounded-xl">
-                    <button id="btn-board-personal" onclick="app.setBoardType('personal')" class="active capsule-btn px-3 py-1 text-xs font-bold rounded-lg">บอร์ดส่วนตัว</button>
-                    <button id="btn-board-group" onclick="app.setBoardType('group')" class="capsule-btn px-3 py-1 text-xs font-bold rounded-lg">บอร์ดกลุ่ม</button>
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#c0b59f] shadow-sm">
+                <div class="flex items-center space-x-2 bg-[#f0ebd9] p-1 rounded-xl">
+                    <button id="btn-board-personal" onclick="app.setBoardType('personal')" class="active capsule-btn px-3 py-1 text-xs font-bold rounded-lg">
+                        บอร์ดส่วนตัว
+                    </button>
+                    <button id="btn-board-group" onclick="app.setBoardType('group')" class="capsule-btn px-3 py-1 text-xs font-bold rounded-lg">
+                        บอร์ดกลุ่ม
+                    </button>
                 </div>
                 <div id="group-board-controls" class="hidden flex items-center space-x-2">
-                    <select id="group-select" onchange="app.handleGroupChange(this.value)" class="text-xs border border-[#c0b59f] rounded-lg px-2.5 py-1.5 bg-white/70 text-[#1f3627]">
+                    <select id="group-select" onchange="app.handleGroupChange(this.value)" class="text-xs border border-[#c0b59f] rounded-lg px-2.5 py-1.5 bg-white text-[#1f3627] focus:outline-none focus:ring-1 focus:ring-[#385441]">
                         <option value="">-- บอร์ดกลุ่มทั้งหมด --</option>
                     </select>
-                    <button onclick="app.addNewGroupBoard()" class="px-2.5 py-1.5 bg-[#e0d8c7] text-[#1f3627] rounded-lg text-xs font-bold">+ กลุ่มใหม่</button>
+                    <button onclick="app.addNewGroupBoard()" class="px-2.5 py-1.5 bg-[#e0d8c7] text-[#1f3627] hover:bg-[#c0b59f] rounded-lg text-xs font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-plus"></i> กลุ่มใหม่
+                    </button>
                 </div>
-                <button onclick="app.openTaskModal()" class="px-3.5 py-1.5 bg-[#385441] text-white rounded-xl text-xs font-bold">+ เพิ่มรายการ</button>
+                <div class="flex items-center space-x-2">
+                    <button onclick="app.openTaskModal()" class="px-3.5 py-1.5 bg-[#385441] text-white hover:bg-[#2d4735] rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus"></i> เพิ่มรายการ
+                    </button>
+                </div>
             </div>
-            <div id="kanban-grid">
-                <div class="kanban-col">
-                    <div class="kanban-head"><span class="dot dot-todo"></span> ต้องทำ (To Do) <span id="badge-todo" class="badge">0</span></div>
-                    <div id="col-todo" class="kanban-list"></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-[#f0ebd9]/60 rounded-2xl p-4 border border-[#c0b59f] flex flex-col h-[calc(100vh-220px)]">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xs font-bold text-[#1f3627] flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span> ต้องทำ (To Do)
+                        </h3>
+                        <span id="badge-todo" class="text-[10px] bg-white text-[#1f3627] font-bold px-2 py-0.5 rounded-full border border-[#c0b59f]">0</span>
+                    </div>
+                    <div id="col-todo" class="flex-1 space-y-2.5 overflow-y-auto pr-1"></div>
                 </div>
-                <div class="kanban-col">
-                    <div class="kanban-head"><span class="dot dot-doing"></span> กำลังทำ (In Progress) <span id="badge-doing" class="badge">0</span></div>
-                    <div id="col-doing" class="kanban-list"></div>
+                <div class="bg-[#f0ebd9]/60 rounded-2xl p-4 border border-[#c0b59f] flex flex-col h-[calc(100vh-220px)]">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xs font-bold text-[#1f3627] flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span> กำลังทำ (In Progress)
+                        </h3>
+                        <span id="badge-doing" class="text-[10px] bg-white text-[#1f3627] font-bold px-2 py-0.5 rounded-full border border-[#c0b59f]">0</span>
+                    </div>
+                    <div id="col-doing" class="flex-1 space-y-2.5 overflow-y-auto pr-1"></div>
                 </div>
-                <div class="kanban-col">
-                    <div class="kanban-head"><span class="dot dot-done"></span> เสร็จแล้ว (Done) <span id="badge-done" class="badge">0</span></div>
-                    <div id="col-done" class="kanban-list"></div>
+                <div class="bg-[#f0ebd9]/60 rounded-2xl p-4 border border-[#c0b59f] flex flex-col h-[calc(100vh-220px)]">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xs font-bold text-[#1f3627] flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> เสร็จแล้ว (Done)
+                        </h3>
+                        <span id="badge-done" class="text-[10px] bg-white text-[#1f3627] font-bold px-2 py-0.5 rounded-full border border-[#c0b59f]">0</span>
+                    </div>
+                    <div id="col-done" class="flex-1 space-y-2.5 overflow-y-auto pr-1"></div>
                 </div>
             </div>
         </section>
@@ -68,37 +105,49 @@
             <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-[#c0b59f] shadow-sm">
                 <div class="flex items-center space-x-3">
                     <h2 id="calendar-month-year" class="text-sm font-bold text-[#1f3627]">เดือน และ ปี</h2>
-                    <button onclick="app.goToday()" class="text-xs bg-[#e0d8c7] px-2.5 py-1 rounded-lg font-medium text-[#1f3627]">วันนี้</button>
+                    <button onclick="app.goToday()" class="text-xs bg-[#e0d8c7] px-2.5 py-1 rounded-lg font-medium text-[#1f3627] hover:bg-[#c0b59f]">
+                        วันนี้
+                    </button>
                 </div>
                 <div class="flex items-center space-x-1">
-                    <button onclick="app.changeMonth(-1)" class="p-1.5 rounded-lg border border-[#c0b59f] text-xs"><i class="fa-solid fa-chevron-left"></i></button>
-                    <button onclick="app.changeMonth(1)" class="p-1.5 rounded-lg border border-[#c0b59f] text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button onclick="app.changeMonth(-1)" class="p-1.5 rounded-lg border border-[#c0b59f] hover:bg-gray-100 text-xs text-[#1f3627]">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button onclick="app.changeMonth(1)" class="p-1.5 rounded-lg border border-[#c0b59f] hover:bg-gray-100 text-xs text-[#1f3627]">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
                 </div>
             </div>
             <div class="bg-white p-4 rounded-2xl border border-[#c0b59f] shadow-sm">
-                <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-[#385441]"><div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div><div>พฤ.</div><div>ศ.</div><div>ส.</div></div>
+                <div class="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-[#385441]">
+                    <div>อา.</div><div>จ.</div><div>อ.</div><div>พ.</div><div>พฤ.</div><div>ศ.</div><div>ส.</div>
+                </div>
                 <div id="calendar-days-grid" class="grid grid-cols-7 gap-2"></div>
             </div>
         </section>
         <section id="view-pomodoro" class="hidden max-w-md mx-auto text-center space-y-6 bg-white p-8 rounded-2xl border border-[#c0b59f] shadow-sm my-8">
-            <h2 class="text-base font-bold text-[#1f3627]">ตัวจับเวลา</h2>
-            <p id="pomo-mode-label" class="text-xs text-gray-500">เหลือเวลา</p>
-            <div class="flex flex-wrap justify-center gap-2">
-                <button id="btn-pomo-work" onclick="app.setTimerMode('work')" class="px-3 py-1 bg-[#385441] text-white rounded-lg text-xs font-bold">นับถอยหลัง</button>
+            <h2 class="text-base font-bold text-[#1f3627]">Pomodoro Focus Timer</h2>
+            <div class="flex justify-center gap-2 flex-wrap">
+                <button id="btn-pomo-work" onclick="app.setTimerMode('work')" class="px-3 py-1 bg-[#385441] text-white rounded-lg text-xs font-bold">โฟกัส</button>
                 <button id="btn-pomo-short" onclick="app.setTimerMode('shortBreak')" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold">พักสั้น</button>
                 <button id="btn-pomo-long" onclick="app.setTimerMode('longBreak')" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold">พักยาว</button>
                 <button id="btn-pomo-elapsed" onclick="app.setTimerMode('elapsed')" class="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold">นับเวลาทำงาน</button>
             </div>
-            <div id="pomo-display" class="text-6xl font-extrabold text-[#1f3627] tracking-wider my-6">25:00</div>
-            <div class="grid grid-cols-3 gap-2 text-left">
-                <label class="text-[10px] font-bold text-[#1f3627]">โฟกัส (นาที)<input id="pomo-min-work" type="number" min="1" value="25" class="mt-1 w-full text-xs border border-[#c0b59f] rounded-lg p-2"></label>
-                <label class="text-[10px] font-bold text-[#1f3627]">พักสั้น (นาที)<input id="pomo-min-short" type="number" min="1" value="5" class="mt-1 w-full text-xs border border-[#c0b59f] rounded-lg p-2"></label>
-                <label class="text-[10px] font-bold text-[#1f3627]">พักยาว (นาที)<input id="pomo-min-long" type="number" min="1" value="15" class="mt-1 w-full text-xs border border-[#c0b59f] rounded-lg p-2"></label>
+            <div class="flex justify-center gap-2 flex-wrap text-left">
+                <label class="text-[10px] text-[#1f3627]">โฟกัส <input id="pomo-min-work" type="number" min="1" value="25" class="w-14 border border-[#c0b59f] rounded p-1 text-xs"></label>
+                <label class="text-[10px] text-[#1f3627]">พักสั้น <input id="pomo-min-short" type="number" min="1" value="5" class="w-14 border border-[#c0b59f] rounded p-1 text-xs"></label>
+                <label class="text-[10px] text-[#1f3627]">พักยาว <input id="pomo-min-long" type="number" min="1" value="15" class="w-14 border border-[#c0b59f] rounded p-1 text-xs"></label>
+                <button type="button" onclick="app.applyCustomTime()" class="px-3 py-1 bg-[#e0d8c7] text-[#1f3627] rounded-lg text-xs font-bold">ใช้เวลานี้</button>
             </div>
-            <button type="button" onclick="app.applyCustomTime()" class="text-xs bg-[#e0d8c7] px-3 py-1.5 rounded-lg font-bold text-[#1f3627]">ใช้เวลาที่ตั้ง</button>
+            <p id="pomo-mode-label" class="text-xs text-gray-500">เหลือเวลา</p>
+            <div id="pomo-display" class="text-6xl font-extrabold text-[#1f3627] tracking-wider my-6">25:00</div>
             <div class="flex justify-center gap-3">
-                <button id="btn-pomo-start" onclick="app.toggleTimer()" class="px-6 py-2.5 bg-[#385441] text-white rounded-xl text-xs font-bold">เริ่มจับเวลา</button>
-                <button onclick="app.resetTimer()" class="px-4 py-2.5 border border-gray-300 rounded-xl text-xs font-bold text-gray-600">รีเซ็ต</button>
+                <button id="btn-pomo-start" onclick="app.toggleTimer()" class="px-6 py-2.5 bg-[#385441] text-white rounded-xl text-xs font-bold shadow hover:bg-[#2d4735]">
+                    เริ่มจับเวลา
+                </button>
+                <button onclick="app.resetTimer()" class="px-4 py-2.5 border border-gray-300 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100">
+                    รีเซ็ต
+                </button>
             </div>
         </section>
         <section id="view-team" class="hidden space-y-4 max-w-2xl mx-auto">
@@ -106,8 +155,8 @@
                 <h3 class="text-xs font-bold text-[#1f3627]"><i class="fa-solid fa-user-plus mr-1.5"></i>เพิ่มเพื่อนใหม่เข้าสู่ระบบ</h3>
                 <p class="text-[10px] text-gray-500">เพิ่มได้เฉพาะบัญชีที่สมัครสมาชิกแล้วเท่านั้น</p>
                 <form onsubmit="app.handleAddFriend(event)" class="flex gap-2">
-                    <input type="email" id="friend-email-input" required placeholder="กรอกอีเมลเพื่อน" class="flex-1 text-xs border border-[#c0b59f] rounded-xl px-3 py-2">
-                    <button type="submit" class="px-4 py-2 bg-[#385441] text-white rounded-xl text-xs font-bold">เพิ่มเพื่อน</button>
+                    <input type="email" id="friend-email-input" required placeholder="กรอกอีเมลเพื่อน เช่น friend@domain.com" class="flex-1 text-xs border border-[#c0b59f] rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
+                    <button type="submit" class="px-4 py-2 bg-[#385441] text-white rounded-xl text-xs font-bold hover:bg-[#2d4735]">เพิ่มเพื่อน</button>
                 </form>
             </div>
             <div class="glass-panel p-5 rounded-2xl border border-[#c0b59f]/50 shadow-sm space-y-3">
@@ -128,19 +177,23 @@
         <div class="bg-white rounded-2xl border border-[#c0b59f] shadow-xl max-w-md w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-gray-100 pb-3">
                 <h3 class="text-sm font-bold text-[#1f3627]">รายละเอียดงาน</h3>
-                <button onclick="app.closeTaskModal()" class="text-gray-400 hover:text-gray-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="app.closeTaskModal()" class="text-gray-400 hover:text-gray-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
             <form onsubmit="app.handleTaskSubmit(event)" class="space-y-3">
                 <input type="hidden" id="task-id">
                 <div>
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">หัวข้องาน *</label>
-                    <input type="text" id="task-title" required class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <input type="text" id="task-title" required class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
                 <div class="bg-[#f7f5ed]/80 p-3 rounded-xl border border-[#c0b59f]/60 space-y-2">
-                    <label class="block text-[11px] font-bold text-[#385441]"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> สแกนรายละเอียดจากรูป ไฟล์ หรือลิงก์</label>
+                    <label class="block text-[11px] font-bold text-[#385441]">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> สแกนรายละเอียดจากรูป ไฟล์ หรือลิงก์
+                    </label>
                     <input type="file" accept="image/*,.pdf,.doc,.docx,.txt" onchange="app.handleImageOCRAndLocation(event)" class="block w-full text-[10px] text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:bg-[#385441] file:text-white">
                     <div class="flex gap-2">
-                        <input type="url" id="task-scan-url" placeholder="วางลิงก์ เช่น https://..." class="flex-1 text-xs border border-[#c0b59f] rounded-lg p-2">
+                        <input type="url" id="task-scan-url" placeholder="วางลิงก์ เช่น https://..." class="flex-1 text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none">
                         <button type="button" onclick="app.scanFromUrl()" class="px-3 py-1.5 bg-[#385441] text-white rounded-lg text-xs font-bold">สแกนลิงก์</button>
                     </div>
                     <div id="ocr-result-preview" class="hidden p-2 bg-white/80 rounded-lg border border-emerald-200 text-[10px] text-gray-700 space-y-1">
@@ -151,21 +204,23 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-bold text-[#1f3627] mb-1">วันเริ่มทำ</label>
-                        <input type="date" id="task-start-date" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                        <input type="date" id="task-start-date" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-[#1f3627] mb-1">วันส่งงาน (Due)</label>
-                        <input type="date" id="task-due-date" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                        <input type="date" id="task-due-date" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                     </div>
                 </div>
                 <div class="flex items-center gap-2 bg-[#f7f5ed] p-2.5 rounded-xl border border-[#c0b59f]/60">
-                    <input type="checkbox" id="task-use-ai" class="w-4 h-4">
-                    <label for="task-use-ai" class="text-[11px] font-bold text-[#1f3627] cursor-pointer">ใช้ AI จัดสรรวันทำงานอัตโนมัติ (เสร็จก่อนกำหนด 1-2 วัน)</label>
+                    <input type="checkbox" id="task-use-ai" class="w-4 h-4 rounded border-[#c0b59f] text-[#385441] focus:ring-[#385441]">
+                    <label for="task-use-ai" class="text-[11px] font-bold text-[#1f3627] cursor-pointer">
+                        ใช้ AI จัดสรรวันทำงานอัตโนมัติ (เสร็จก่อนกำหนด 1-2 วัน)
+                    </label>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[11px] font-bold text-[#1f3627] mb-1">ระดับความสำคัญ</label>
-                        <select id="task-priority" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                        <select id="task-priority" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                             <option value="low">ทั่วไป</option>
                             <option value="medium" selected>ปานกลาง</option>
                             <option value="high">ด่วนมาก</option>
@@ -173,7 +228,7 @@
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-[#1f3627] mb-1">สถานะ</label>
-                        <select id="task-status" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                        <select id="task-status" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                             <option value="todo">ต้องทำ</option>
                             <option value="doing">กำลังทำ</option>
                             <option value="done">เสร็จแล้ว</option>
@@ -182,28 +237,35 @@
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">ประเภทบอร์ด</label>
-                    <select id="task-type" onchange="app.toggleTaskTypeFields(this.value)" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <select id="task-type" onchange="app.toggleTaskTypeFields(this.value)" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                         <option value="personal">ส่วนตัว</option>
                         <option value="group">งานกลุ่ม</option>
                     </select>
                 </div>
                 <div id="task-group-board-select-box" class="hidden">
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">ชื่อบอร์ดกลุ่ม</label>
-                    <select id="task-board-name" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2"><option value="งานกลุ่มทั่วไป">งานกลุ่มทั่วไป</option></select>
+                    <select id="task-board-name" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
+                        <option value="งานกลุ่มทั่วไป">งานกลุ่มทั่วไป</option>
+                    </select>
                 </div>
                 <div id="task-tag-friend-box" class="hidden space-y-2">
                     <label class="block text-[11px] font-bold text-[#1f3627]">แท็กเพื่อนเข้าร่วมบอร์ดกลุ่มนี้</label>
-                    <div id="task-tagged-members-list" class="space-y-1"></div>
+                    <div id="task-tagged-members-list" class="space-y-1">
+                    </div>
                     <div class="flex gap-2">
-                        <select id="task-friend-select" class="flex-1 text-xs border border-[#c0b59f] rounded-lg p-2"><option value="">-- เลือกเพื่อนจากรายชื่อ --</option></select>
+                        <select id="task-friend-select" class="flex-1 text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none">
+                            <option value="">-- เลือกเพื่อนจากรายชื่อ --</option>
+                        </select>
                         <button type="button" onclick="app.addMemberToCurrentTask()" class="px-3 py-1.5 bg-[#385441] text-white rounded-lg text-xs font-bold">เพิ่มสมาชิก</button>
                     </div>
                 </div>
                 <div class="flex justify-between items-center pt-3 border-t border-gray-100">
-                    <button type="button" id="btn-delete-task" onclick="app.deleteTask()" class="text-xs text-red-600 font-bold hidden"><i class="fa-solid fa-trash mr-1"></i> ลบงานนี้</button>
+                    <button type="button" id="btn-delete-task" onclick="app.deleteTask()" class="text-xs text-red-600 hover:text-red-800 font-bold hidden">
+                        <i class="fa-solid fa-trash mr-1"></i> ลบงานนี้
+                    </button>
                     <div class="flex gap-2 ml-auto">
-                        <button type="button" onclick="app.closeTaskModal()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-600">ยกเลิก</button>
-                        <button type="submit" class="px-4 py-1.5 bg-[#385441] text-white rounded-lg text-xs font-bold">บันทึก</button>
+                        <button type="button" onclick="app.closeTaskModal()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-100">ยกเลิก</button>
+                        <button type="submit" class="px-4 py-1.5 bg-[#385441] text-white rounded-lg text-xs font-bold hover:bg-[#2d4735]">บันทึก</button>
                     </div>
                 </div>
             </form>
@@ -218,18 +280,22 @@
             <form id="auth-form" onsubmit="return false;" class="space-y-3">
                 <div id="auth-name-box" class="hidden">
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">ชื่อ *</label>
-                    <input type="text" id="auth-name" placeholder="ชื่อของคุณ" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <input type="text" id="auth-name" placeholder="ชื่อของคุณ" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">อีเมล *</label>
-                    <input type="email" id="auth-email" required placeholder="name@example.com" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <input type="email" id="auth-email" placeholder="name@example.com" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-[#1f3627] mb-1">รหัสผ่าน *</label>
-                    <input type="password" id="auth-password" required placeholder="••••••••" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <input type="password" id="auth-password" placeholder="••••••••" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-[#385441]">
                 </div>
-                <button type="button" onclick="app.doLogin()" class="w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold">เข้าสู่ระบบ</button>
-                <button type="button" onclick="app.doRegister()" class="w-full py-2 bg-[#e0d8c7] text-[#1f3627] rounded-xl text-xs font-bold">สมัครสมาชิก</button>
+                <button type="button" id="auth-submit-btn" onclick="app.doLogin()" class="w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold hover:bg-[#2d4735] shadow-sm">
+                    เข้าสู่ระบบ
+                </button>
+                <button type="button" id="auth-register-btn" onclick="app.doRegister()" class="w-full py-2 bg-[#e0d8c7] text-[#1f3627] rounded-xl text-xs font-bold hover:bg-[#c0b59f] shadow-sm">
+                    สมัครสมาชิก
+                </button>
                 <button type="button" onclick="app.showForgot()" class="w-full text-[11px] text-[#385441] underline">ลืมรหัสผ่าน</button>
                 <div id="forgot-box" class="hidden space-y-2 border-t border-gray-100 pt-3">
                     <p id="forgot-step-text" class="text-[10px] text-gray-500">กรอกอีเมลที่ใช้สมัคร ระบบจะสร้างรหัสสำรอง</p>
@@ -242,24 +308,38 @@
                     <button type="button" id="forgot-save-btn" onclick="app.saveNewPassword()" class="hidden w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold">บันทึกรหัสใหม่</button>
                 </div>
             </form>
+            <p id="auth-switch-text" class="text-center text-xs text-gray-500">
+                กรอกข้อมูลแล้วกดปุ่มด้านบนตามต้องการ
+            </p>
         </div>
     </div>
     <div id="profile-modal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl border border-[#c0b59f] shadow-xl max-w-md w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-gray-100 pb-2">
                 <h3 class="text-sm font-bold text-[#1f3627]">ข้อมูลส่วนตัว & คำเชิญเข้าร่วมบอร์ด</h3>
-                <button onclick="app.closeProfileModal()" class="text-gray-400 hover:text-gray-600 text-sm"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="app.closeProfileModal()" class="text-gray-400 hover:text-gray-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
             <div class="text-center py-2 bg-[#f7f5ed] rounded-xl p-3 border border-[#c0b59f]/50">
+                <div class="w-12 h-12 rounded-full bg-[#385441] text-white font-bold text-lg flex items-center justify-center mx-auto mb-2">
+                    <i class="fa-solid fa-user"></i>
+                </div>
                 <h4 id="profile-modal-name" class="text-xs font-bold text-[#1f3627]">-</h4>
                 <p id="profile-modal-email" class="text-[10px] text-gray-500">-</p>
             </div>
-            <div id="profile-invitations-list" class="space-y-2"></div>
+            <div class="space-y-2">
+                <h4 class="text-xs font-bold text-[#1f3627] flex items-center gap-1.5">
+                    <i class="fa-solid fa-envelope-open-text text-[#385441]"></i> คำเชิญเข้าร่วมบอร์ดกลุ่ม
+                </h4>
+                <div id="profile-invitations-list" class="space-y-2">
+                </div>
+            </div>
         </div>
     </div>
-    <div id="toast" class="hidden fixed bottom-5 right-5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium z-50"></div>
+    <div id="toast" class="hidden fixed bottom-5 right-5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium z-50 transition-all duration-300"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
