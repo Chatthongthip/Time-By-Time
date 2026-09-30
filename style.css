@@ -1,37 +1,115 @@
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+html,
+body {
+    min-height: 100vh;
+    margin: 0;
+    background-color: transparent !important;
+}
+
 body {
     font-family: 'Sarabun', sans-serif;
+    background-image: url('พื้นหลัง.gif') !important;
+    background-size: cover !important;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
+}
+
+header {
+    background-color: rgba(240, 235, 217, 0.25) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+.board-toolbar,
+.glass-panel,
+#view-calendar>div,
+#view-pomodoro,
+#view-team>div,
+.bg-white {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-color: rgba(255, 255, 255, 0.35) !important;
 }
 
 .capsule-btn {
-    background-color: #e0d8c7;
+    background-color: rgba(224, 216, 199, 0.5);
     color: #1f3627;
-    transition: all 0.2s ease;
-}
-
-.capsule-btn:hover {
-    background-color: #c0b59f;
 }
 
 .capsule-btn.active {
-    background-color: #385441;
+    background-color: rgba(56, 84, 65, 0.9);
     color: #ffffff;
 }
 
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+#kanban-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+.kanban-col {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 16px;
+    padding: 14px;
+    min-height: 480px;
+    display: flex;
+    flex-direction: column;
 }
 
-::-webkit-scrollbar-thumb {
-    background: #c0b59f;
-    border-radius: 10px;
+.kanban-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1f3627;
+    margin-bottom: 10px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #385441;
+.badge {
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 10px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-todo {
+    background: #f59e0b;
+}
+
+.dot-doing {
+    background: #3b82f6;
+}
+
+.dot-done {
+    background: #10b981;
+}
+
+.kanban-list,
+#col-todo,
+#col-doing,
+#col-done {
+    flex: 1;
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    border: none !important;
+    min-height: 0 !important;
 }
