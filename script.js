@@ -217,7 +217,6 @@ class App {
 
     doRegister() {
         this.authMode = 'register';
-        // แสดงช่องชื่อก่อนสมัคร
         var nameBox = document.getElementById('auth-name-box');
         if (nameBox) nameBox.classList.remove('hidden');
         var title = document.getElementById('auth-title');
@@ -242,11 +241,9 @@ class App {
 
         var users = this.getUsers();
 
-        // ========== สมัครสมาชิก ==========
         if (this.authMode === 'register') {
             var name = nameEl ? String(nameEl.value || '').trim() : '';
             if (!name) {
-                // ถ้ายังไม่กรอกชื่อ ให้โชว์ช่องชื่อแล้วหยุด
                 var nameBox = document.getElementById('auth-name-box');
                 if (nameBox) nameBox.classList.remove('hidden');
                 this.showToast('กรุณากรอกชื่อก่อนสมัครสมาชิก', 'warning');
@@ -293,14 +290,12 @@ class App {
             return false;
         }
 
-        // ========== เข้าสู่ระบบ ==========
         var found = null;
         for (var j = 0; j < users.length; j++) {
             if (users[j].email === email) { found = users[j]; break; }
         }
 
         if (!found) {
-            // อีเมลไม่เคยสมัคร → เด้งไปโหมดสมัคร
             this.showToast('ไม่พบบัญชีนี้ กรุณากรอกชื่อแล้วกดสมัครสมาชิก', 'warning');
             this.authMode = 'register';
             var nb = document.getElementById('auth-name-box');
@@ -335,6 +330,81 @@ class App {
         this.updateProfileBadge();
         this.showToast('เข้าสู่ระบบสำเร็จ!', 'success');
         return false;
+    }
+
+    showForgot() {
+        var box = document.getElementById('forgot-box');
+        if (box) box.classList.remove('hidden');
+        var email = document.getElementById('auth-email');
+        var target = document.getElementById('forgot-email');
+        if (email && target && email.value) target.value = email.value;
+    }
+    sendResetCode() {
+        var emailEl = document.getElementById('forgot-email');
+        var email = emailEl ? String(emailEl.value || '').trim().toLowerCase() : '';
+        var users = this.getUsers();
+        var found = null;
+        for (var i = 0; i < users.length; i++)
+            if (users[i].email === email) found = users[i];
+        if (!found) return this.showToast('ไม่พบบัญชีนี้ในระบบ', 'warning');
+        var code = String(Math.floor(100000 + Math.random() * 900000));
+        var resets = {};
+        try { resets = JSON.parse(localStorage.getItem('tb_resets') || '{}'); } catch (e) {}
+        resets[email] = { code: code, exp: Date.now() + 10 * 60 * 1000 };
+        localStorage.setItem('tb_resets', JSON.stringify(resets));
+        var subject = encodeURIComponent('รหัสสำรอง TimeByTime');
+        var body = encodeURIComponent('รหัสสำรองของคุณคือ ' + code + ' ใช้ได้ 10 นาที');
+        window.open('mailto:' + email + '?subject=' + subject + '&body=' + body);
+        var codeEl = document.getElementById('forgot-code');
+        var verifyBtn = document.getElementById('forgot-verify-btn');
+        var step = document.getElementById('forgot-step-text');
+        if (codeEl) codeEl.classList.remove('hidden');
+        if (verifyBtn) verifyBtn.classList.remove('hidden');
+        if (step) step.innerText = 'เปิดหน้าส่งเมลแล้ว นำรหัส 6 หลักมากรอกที่นี่ (ใช้ได้ 10 นาที)';
+        this.showToast('สร้างรหัสสำรองแล้ว ตรวจอีเมลที่ใช้สมัคร', 'success');
+    }
+    verifyResetCode() {
+        var email = String((document.getElementById('forgot-email') || {}).value || '').trim().toLowerCase();
+        var code = String((document.getElementById('forgot-code') || {}).value || '').trim();
+        var resets = {};
+        try { resets = JSON.parse(localStorage.getItem('tb_resets') || '{}'); } catch (e) {}
+        var row = resets[email];
+        if (!row || row.exp < Date.now()) return this.showToast('รหัสหมดอายุ ส่งใหม่อีกครั้ง', 'warning');
+        if (row.code !== code) return this.showToast('รหัสสำรองไม่ถูกต้อง', 'error');
+        this.resetEmail = email;
+        ['forgot-new-pass', 'forgot-new-pass2'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.remove('hidden');
+        });
+        var saveBtn = document.getElementById('forgot-save-btn');
+        var step = document.getElementById('forgot-step-text');
+        if (saveBtn) saveBtn.classList.remove('hidden');
+        if (step) step.innerText = 'รหัสถูกต้อง ตั้งรหัสผ่านใหม่ได้เลย';
+    }
+    saveNewPassword() {
+        var p1 = (document.getElementById('forgot-new-pass') || {}).value || '';
+        var p2 = (document.getElementById('forgot-new-pass2') || {}).value || '';
+        if (!p1 || p1.length < 4) return this.showToast('รหัสใหม่ต้องมีอย่างน้อย 4 ตัว', 'warning');
+        if (p1 !== p2) return this.showToast('รหัสยืนยันไม่ตรงกัน', 'error');
+        var users = this.getUsers();
+        var ok = false;
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].email === this.resetEmail) { users[i].password = p1;
+                ok = true; }
+        }
+        if (!ok || !this.saveUsers(users)) return this.showToast('บันทึกรหัสไม่สำเร็จ', 'error');
+        var resets = {};
+        try { resets = JSON.parse(localStorage.getItem('tb_resets') || '{}'); } catch (e) {}
+        delete resets[this.resetEmail];
+        localStorage.setItem('tb_resets', JSON.stringify(resets));
+        var emailEl = document.getElementById('auth-email');
+        var passEl = document.getElementById('auth-password');
+        var box = document.getElementById('forgot-box');
+        if (emailEl) emailEl.value = this.resetEmail;
+        if (passEl) passEl.value = '';
+        if (box) box.classList.add('hidden');
+        this.authMode = 'login';
+        this.showToast('ตั้งรหัสใหม่แล้ว เข้าสู่ระบบได้เลย', 'success');
     }
 
     handleLogout() {
@@ -537,9 +607,11 @@ class App {
         if (!this.currentUser) return;
         const userEmail = this.currentUser.email;
         let filtered = this.getTasks().filter(t => {
-            if (this.activeBoardType === 'personal') return t.type === 'personal' && t.userEmail === userEmail;
-            const ok = t.userEmail === userEmail || (t.taggedEmails || []).includes(userEmail);
-            return ok && (!this.activeGroup || t.boardName === this.activeGroup);
+            var mine = t.userEmail === userEmail || (t.taggedEmails || []).includes(userEmail);
+            if (!mine) return false;
+            if (this.activeBoardType === 'personal') return t.type === 'personal';
+            if (t.type !== 'group') return false;
+            return !this.activeGroup || t.boardName === this.activeGroup;
         });
         const cols = { todo: [], doing: [], done: [] };
         filtered.forEach(t => { if (cols[t.status]) cols[t.status].push(t); });
@@ -552,32 +624,62 @@ class App {
             cols[st].forEach(t => c.appendChild(this.createTaskCard(t)));
         });
         this.updateGroupSelectOptions();
+        if (!window.__tbOutside) {
+            window.__tbOutside = true;
+            document.addEventListener('click', function(ev) {
+                if (!ev.target.closest('#col-todo, #col-doing, #col-done')) {
+                    document.querySelectorAll('.task-detail').forEach(function(el) { el.classList.add('hidden'); });
+                }
+            });
+        }
     }
 
     createTaskCard(task) {
-            const card = document.createElement('div');
-            card.className = 'p-3 bg-white rounded-xl border border-[#c0b59f] shadow-sm hover:shadow-md cursor-pointer space-y-1.5';
-            card.onclick = () => this.openEditTaskModal(task.id);
-            const pri = { low: ['bg-emerald-100 text-emerald-800', 'ทั่วไป'], medium: ['bg-amber-100 text-amber-800', 'ปานกลาง'], high: ['bg-red-100 text-red-800', 'ด่วน'] };
-            const [pc, pt] = pri[task.priority] || pri.medium;
-            let plans = '';
-            if (task.dailyPlans && task.dailyPlans.length) {
-                plans = `<div class="mt-2 pt-2 border-t border-gray-100 space-y-1"><div class="text-[9px] font-bold text-[#385441]">แผน AI:</div>` +
-                    task.dailyPlans.slice(0, 3).map(p => `<div class="text-[9px] text-gray-600 truncate">• ${p.date}: ${this.escapeHtml(p.description)}</div>`).join('') +
-                    (task.dailyPlans.length > 3 ? `<div class="text-[9px] text-gray-400">+ อีก ${task.dailyPlans.length - 3}</div>` : '') + '</div>';
-            }
-            card.innerHTML = `<div class="flex justify-between"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${pc}">${pt}</span>
-            ${task.dueDate ? `<span class="text-[10px] text-gray-500">${task.dueDate}</span>` : ''}</div>
-            <h4 class="text-xs font-bold text-[#1f3627] truncate">${this.escapeHtml(task.title)}</h4>
-            ${task.boardName ? `<div class="text-[9px] text-[#385441] bg-[#e0d8c7] inline-block px-1.5 py-0.5 rounded font-bold">${this.escapeHtml(task.boardName)}</div>` : ''}
-            ${plans}`;
+        const card = document.createElement('div');
+        card.className = 'p-3 bg-white rounded-xl border border-[#c0b59f] shadow-sm cursor-pointer space-y-1.5';
+        const pri = { low: ['bg-emerald-100 text-emerald-800', 'ทั่วไป'], medium: ['bg-amber-100 text-amber-800', 'ปานกลาง'], high: ['bg-red-100 text-red-800', 'ด่วน'] };
+        const pc = (pri[task.priority] || pri.medium)[0];
+        const pt = (pri[task.priority] || pri.medium)[1];
+        let plans = '';
+        if (task.dailyPlans && task.dailyPlans.length) {
+            plans = '<div class="text-[9px] font-bold text-[#385441]">แผน AI</div>' +
+                task.dailyPlans.slice(0, 3).map(p => '<div class="text-[9px] text-gray-600 truncate">• ' + p.date + ': ' + this.escapeHtml(p.description) + '</div>').join('');
+        }
+        let scan = '';
+        if (task.scanText || task.scanUrl || task.scanFile) {
+            scan = '<div class="text-[9px] font-bold text-[#385441] mt-1">รายละเอียดที่สแกน</div>' +
+                (task.scanText ? '<div class="text-[10px] text-gray-700 whitespace-pre-wrap">' + this.escapeHtml(task.scanText) + '</div>' : '') +
+                (task.scanFile ? '<div class="text-[10px] text-gray-500">ไฟล์: ' + this.escapeHtml(task.scanFile) + '</div>' : '') +
+                (task.scanUrl ? '<a href="' + this.escapeHtml(task.scanUrl) + '" target="_blank" class="text-[10px] text-blue-700 underline break-all">' + this.escapeHtml(task.scanUrl) + '</a>' : '');
+        }
+        card.innerHTML = '<div class="flex justify-between"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + pc + '">' + pt + '</span>' +
+            (task.dueDate ? '<span class="text-[10px] text-gray-500">' + this.escapeHtml(task.dueDate) + '</span>' : '') + '</div>' +
+            '<h4 class="text-xs font-bold text-[#1f3627] truncate">' + this.escapeHtml(task.title) + '</h4>' +
+            (task.type === 'group' && task.boardName ? '<div class="text-[9px] text-[#385441] bg-[#e0d8c7] inline-block px-1.5 py-0.5 rounded font-bold">' + this.escapeHtml(task.boardName) + '</div>' : '') +
+            '<div class="text-[9px] text-gray-400">คลิกเพื่อดูรายละเอียด</div>' +
+            '<div class="task-detail hidden mt-2 pt-2 border-t border-gray-100 space-y-1">' + plans + scan +
+            '<button type="button" class="edit-task text-[10px] font-bold text-[#385441] underline">แก้ไขงาน</button></div>';
+        var self = this;
+        card.onclick = function(ev) {
+            if (ev.target.closest('a') || ev.target.closest('.edit-task')) return;
+            document.querySelectorAll('.task-detail').forEach(function(el) {
+                if (el !== card.querySelector('.task-detail')) el.classList.add('hidden');
+            });
+            card.querySelector('.task-detail').classList.toggle('hidden');
+        };
+        card.querySelector('.edit-task').onclick = function(ev) {
+            ev.stopPropagation();
+            self.openEditTaskModal(task.id);
+        };
         return card;
     }
 
     updateGroupSelectOptions() {
-        const select = document.getElementById('group-select'), modal = document.getElementById('task-board-name');
+        const select = document.getElementById('group-select'),
+            modal = document.getElementById('task-board-name');
         if (!select) return;
-        const userEmail = this.currentUser.email, groups = new Set();
+        const userEmail = this.currentUser.email,
+            groups = new Set();
         this.getTasks().forEach(t => {
             if (t.type === 'group' && t.boardName && (t.userEmail === userEmail || (t.taggedEmails || []).includes(userEmail))) groups.add(t.boardName);
         });
@@ -588,13 +690,16 @@ class App {
             if (modal) modal.appendChild(new Option(g, g));
         });
     }
-    handleGroupChange(v) { this.activeGroup = v; this.renderKanban(); }
+    handleGroupChange(v) { this.activeGroup = v;
+        this.renderKanban(); }
     addNewGroupBoard() {
         const name = prompt('ชื่อบอร์ดกลุ่มใหม่:');
         if (!name || !String(name).trim()) return;
-        this.activeGroup = name.trim(); this.updateGroupSelectOptions();
+        this.activeGroup = name.trim();
+        this.updateGroupSelectOptions();
         document.getElementById('group-select').value = this.activeGroup;
-        this.renderKanban(); this.showToast(`สร้างบอร์ด "${this.activeGroup}" สำเร็จ`, 'success');
+        this.renderKanban();
+        this.showToast(`สร้างบอร์ด "${this.activeGroup}" สำเร็จ`, 'success');
     }
 
     openTaskModal() {
@@ -603,7 +708,9 @@ class App {
         document.getElementById('task-status').value = 'todo';
         document.getElementById('task-type').value = this.activeBoardType;
         document.getElementById('task-use-ai').checked = false;
-        this.currentTaskMembers = []; this.renderTaskTaggedMembers(); this.updateTaskFriendSelectOptions();
+        this.currentTaskMembers = [];
+        this.renderTaskTaggedMembers();
+        this.updateTaskFriendSelectOptions();
         this.toggleTaskTypeFields(this.activeBoardType);
         var ocrPrev = document.getElementById('ocr-result-preview');
         var delBtn = document.getElementById('btn-delete-task');
@@ -612,7 +719,8 @@ class App {
         document.getElementById('task-modal').classList.remove('hidden');
     }
     openEditTaskModal(id) {
-        const task = this.getTasks().find(t => t.id === id); if (!task) return;
+        const task = this.getTasks().find(t => t.id === id);
+        if (!task) return;
         document.getElementById('task-id').value = task.id;
         document.getElementById('task-title').value = task.title;
         document.getElementById('task-start-date').value = task.startDate || '';
@@ -622,10 +730,12 @@ class App {
         document.getElementById('task-type').value = task.type || 'personal';
         document.getElementById('task-use-ai').checked = !!task.useAI;
         this.currentTaskMembers = task.taggedEmails || [];
-        this.renderTaskTaggedMembers(); this.updateTaskFriendSelectOptions();
+        this.renderTaskTaggedMembers();
+        this.updateTaskFriendSelectOptions();
         this.toggleTaskTypeFields(task.type || 'personal');
         if (task.type === 'group' && task.boardName) {
-            const s = document.getElementById('task-board-name'); if (s) s.value = task.boardName;
+            const s = document.getElementById('task-board-name');
+            if (s) s.value = task.boardName;
         }
         var delBtn2 = document.getElementById('btn-delete-task');
         if (delBtn2) delBtn2.classList.remove('hidden');
@@ -643,7 +753,8 @@ class App {
         const email = friendSel ? friendSel.value : '';
         if (!email) return;
         if (this.currentTaskMembers.includes(email)) return this.showToast('แท็กแล้ว', 'warning');
-        this.currentTaskMembers.push(email); this.renderTaskTaggedMembers();
+        this.currentTaskMembers.push(email);
+        this.renderTaskTaggedMembers();
         document.getElementById('task-friend-select').value = '';
     }
     removeMemberFromCurrentTask(email) {
@@ -651,18 +762,21 @@ class App {
         this.renderTaskTaggedMembers();
     }
     renderTaskTaggedMembers() {
-        const c = document.getElementById('task-tagged-members-list'); if (!c) return;
-        c.innerHTML = this.currentTaskMembers.length
-            ? this.currentTaskMembers.map(e => `<div class="flex justify-between bg-white px-2 py-1 rounded border text-[10px]">
+        const c = document.getElementById('task-tagged-members-list');
+        if (!c) return;
+        c.innerHTML = this.currentTaskMembers.length ?
+            this.currentTaskMembers.map(e => `<div class="flex justify-between bg-white px-2 py-1 rounded border text-[10px]">
                 <span>${this.escapeHtml(e)}</span>
-                <button type="button" onclick="app.removeMemberFromCurrentTask('${e}')" class="text-red-600 font-bold">x</button></div>`).join('')
-            : '<div class="text-[10px] text-gray-500 italic">ยังไม่มีสมาชิก</div>';
+                <button type="button" onclick="app.removeMemberFromCurrentTask('${e}')" class="text-red-600 font-bold">x</button></div>`).join('') :
+            '<div class="text-[10px] text-gray-500 italic">ยังไม่มีสมาชิก</div>';
     }
 
     handleTaskSubmit(e) {
-        e.preventDefault(); if (!this.currentUser) return;
+        e.preventDefault();
+        if (!this.currentUser) return;
         const taskId = document.getElementById('task-id').value;
-        const title = document.getElementById('task-title').value.trim(); if (!title) return;
+        const title = document.getElementById('task-title').value.trim();
+        if (!title) return;
         const startDate = document.getElementById('task-start-date').value;
         const dueDate = document.getElementById('task-due-date').value;
         const priority = document.getElementById('task-priority').value;
@@ -673,7 +787,12 @@ class App {
         let allTasks = this.getTasks();
         var boardEl = document.getElementById('task-board-name');
         const boardName = type === 'group' ? (boardEl ? boardEl.value : null) : null;
-        const data = { title, startDate, dueDate, time: '', location: '', priority, status, type, userEmail, boardName, taggedEmails: this.currentTaskMembers, useAI };
+        var scanUrlEl = document.getElementById('task-scan-url');
+        var oldTask = taskId ? allTasks.find(function(t) { return t.id === taskId; }) : null;
+        var scanUrl = (scanUrlEl && scanUrlEl.value.trim()) || this.pendingScanUrl || (oldTask && oldTask.scanUrl) || '';
+        var scanText = this.pendingScanText || (oldTask && oldTask.scanText) || '';
+        var scanFile = this.pendingScanFile || (oldTask && oldTask.scanFile) || '';
+        const data = { title, startDate, dueDate, time: '', location: '', priority, status, type, userEmail, boardName, taggedEmails: this.currentTaskMembers, useAI, scanUrl, scanText, scanFile };
         let taskObj = type === 'group' ? new GroupTask(data) : new PersonalTask(data);
         taskObj.dailyPlans = (useAI && startDate && dueDate) ? AIScheduler.createDailyPlans(taskObj) : [];
         if (useAI && startDate && dueDate) this.showToast('AI กำลังจัดสรรวัน...', 'info');
@@ -681,8 +800,10 @@ class App {
         if (taskId) {
             const idx = allTasks.findIndex(t => t.id === taskId);
             if (idx !== -1) {
-                taskObj.id = taskId; taskObj.createdAt = allTasks[idx].createdAt;
-                taskObj.updatedAt = new Date().toISOString(); allTasks[idx] = taskObj;
+                taskObj.id = taskId;
+                taskObj.createdAt = allTasks[idx].createdAt;
+                taskObj.updatedAt = new Date().toISOString();
+                allTasks[idx] = taskObj;
             }
         } else {
             allTasks.push(taskObj);
@@ -691,8 +812,12 @@ class App {
                 this.currentTaskMembers.forEach(target => {
                     if (target !== userEmail) inv.push({
                         id: 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-                        taskId: taskObj.id, taskTitle: title, boardName: boardName || 'งานกลุ่มทั่วไป',
-                        senderEmail: userEmail, targetEmail: target, status: 'pending'
+                        taskId: taskObj.id,
+                        taskTitle: title,
+                        boardName: boardName || 'งานกลุ่มทั่วไป',
+                        senderEmail: userEmail,
+                        targetEmail: target,
+                        status: 'pending'
                     });
                 });
                 this.saveInvitations(inv);
@@ -701,29 +826,39 @@ class App {
 
         let pulled = false;
         if (status === 'done' && dueDate) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const due = new Date(dueDate); due.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const due = new Date(dueDate);
+            due.setHours(0, 0, 0, 0);
             if (today < due) {
                 const next = allTasks.filter(t => t.id !== taskObj.id && t.status !== 'done' && (t.startDate || t.dueDate));
                 if (next.length) {
                     const daysEarly = Math.round((due - today) / 86400000);
                     if (confirm(`งานนี้เสร็จก่อนกำหนด ~${daysEarly} วัน\n\nเลื่อนตารางงานถัดไปขึ้นไหม?\nตกลง = เลื่อนขึ้น | ยกเลิก = คงเดิม`)) {
-                        allTasks = this.pullUpNextTasks(taskObj, allTasks, daysEarly); pulled = true;
+                        allTasks = this.pullUpNextTasks(taskObj, allTasks, daysEarly);
+                        pulled = true;
                     }
                 }
             }
         }
 
-        this.saveTasks(allTasks); this.closeTaskModal(); this.renderKanban(); this.renderCalendar();
+        this.pendingScanText = '';
+        this.pendingScanUrl = '';
+        this.pendingScanFile = '';
+        this.saveTasks(allTasks);
+        this.closeTaskModal();
+        this.renderKanban();
+        this.renderCalendar();
         this.showToast(pulled ? 'เลื่อนตารางงานถัดไปแล้ว' : (taskId ? 'แก้ไขเรียบร้อย' : 'เพิ่มงานสำเร็จ'), 'success');
     }
 
     pullUpNextTasks(completed, allTasks, daysEarly) {
         if (!daysEarly || daysEarly <= 0) return allTasks;
-        const shift = (d) => { if (!d) return d; const x = new Date(d); x.setDate(x.getDate() - daysEarly); return x.toISOString().slice(0, 10); };
+        const shift = (d) => { if (!d) return d; const x = new Date(d);
+            x.setDate(x.getDate() - daysEarly); return x.toISOString().slice(0, 10); };
         return allTasks.map(t => {
             if (t.id === completed.id || t.status === 'done' || !(t.startDate || t.dueDate)) return t;
-            const u = { ...t };
+            const u = {...t };
             if (u.startDate) u.startDate = shift(u.startDate);
             if (u.dueDate) u.dueDate = shift(u.dueDate);
             if (u.dailyPlans && u.dailyPlans.length) u.dailyPlans = u.dailyPlans.map(function(p) { return Object.assign({}, p, { date: shift(p.date) }); });
@@ -733,9 +868,12 @@ class App {
 
     deleteTask(id) {
         if (!confirm('ลบงานนี้?')) return;
-        const tid = id || document.getElementById('task-id').value; if (!tid) return;
+        const tid = id || document.getElementById('task-id').value;
+        if (!tid) return;
         this.saveTasks(this.getTasks().filter(t => t.id !== tid));
-        this.closeTaskModal(); this.renderKanban(); this.renderCalendar();
+        this.closeTaskModal();
+        this.renderKanban();
+        this.renderCalendar();
         this.showToast('ลบงานแล้ว', 'info');
     }
 
@@ -744,6 +882,7 @@ class App {
         if (!file) return;
         var isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
         if (isPdf) return this.scanPdfFile(file);
+        this.pendingScanFile = file.name;
         this.fillScanResult('งานสแกน: ' + file.name.replace(/\.[^.]+$/, ''), 'อ่านไฟล์สำเร็จ', file.name + ' (' + Math.ceil(file.size / 1024) + ' KB)');
         this.showToast('สแกนไฟล์สำเร็จ', 'success');
     }
@@ -756,18 +895,18 @@ class App {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         this.showToast('กำลังดึงข้อความจาก PDF...', 'info');
         var reader = new FileReader();
-        reader.onload = function () {
-            pdfjsLib.getDocument({ data: reader.result }).promise.then(function (pdf) {
+        reader.onload = function() {
+            pdfjsLib.getDocument({ data: reader.result }).promise.then(function(pdf) {
                 var jobs = [];
                 var maxPages = Math.min(pdf.numPages, 5);
                 for (var i = 1; i <= maxPages; i++) {
-                    jobs.push(pdf.getPage(i).then(function (page) {
-                        return page.getTextContent().then(function (content) {
-                            return content.items.map(function (item) { return item.str; }).join(' ');
+                    jobs.push(pdf.getPage(i).then(function(page) {
+                        return page.getTextContent().then(function(content) {
+                            return content.items.map(function(item) { return item.str; }).join(' ');
                         });
                     }));
                 }
-                return Promise.all(jobs).then(function (pages) {
+                return Promise.all(jobs).then(function(pages) {
                     var text = pages.join('\n').replace(/\s+/g, ' ').trim();
                     if (!text || text.length < 8) {
                         self.showToast('PDF เป็นภาพ กำลัง OCR...', 'info');
@@ -779,7 +918,7 @@ class App {
                     self.fillScanResult(titleEl ? titleEl.value : firstLine, 'ดึงข้อความจาก PDF ได้ ' + maxPages + ' หน้า', text.slice(0, 400));
                     self.showToast('ดึงข้อความจาก PDF สำเร็จ', 'success');
                 });
-            }).catch(function () {
+            }).catch(function() {
                 self.showToast('อ่าน PDF ไม่สำเร็จ', 'error');
             });
         };
@@ -795,19 +934,19 @@ class App {
         var maxPages = Math.min(pdf.numPages, 2);
         var chain = Promise.resolve('');
         for (var i = 1; i <= maxPages; i++) {
-            (function (pageNo) {
-                chain = chain.then(function (acc) {
-                    return pdf.getPage(pageNo).then(function (page) {
+            (function(pageNo) {
+                chain = chain.then(function(acc) {
+                    return pdf.getPage(pageNo).then(function(page) {
                         var viewport = page.getViewport({ scale: 1.6 });
                         var canvas = document.createElement('canvas');
                         canvas.width = viewport.width;
                         canvas.height = viewport.height;
-                        return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function () {
+                        return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
                             return Tesseract.recognize(canvas, 'tha+eng', {
-                                logger: function (m) {
+                                logger: function(m) {
                                     if (m.status === 'recognizing text') self.showToast('OCR หน้า ' + pageNo + ' ' + Math.round((m.progress || 0) * 100) + '%', 'info');
                                 }
-                            }).then(function (res) {
+                            }).then(function(res) {
                                 return (acc + ' ' + (res.data.text || '')).trim();
                             });
                         });
@@ -815,7 +954,7 @@ class App {
                 });
             })(i);
         }
-        chain.then(function (text) {
+        chain.then(function(text) {
             text = String(text || '').replace(/\s+/g, ' ').trim();
             if (!text) {
                 self.showToast('OCR ไม่พบตัวอักษรในภาพ', 'warning');
@@ -827,7 +966,7 @@ class App {
             if (titleEl && !titleEl.value) titleEl.value = firstLine;
             self.fillScanResult(firstLine, 'OCR จาก PDF ภาพได้ ' + maxPages + ' หน้า', text.slice(0, 400));
             self.showToast('OCR สำเร็จ', 'success');
-        }).catch(function () {
+        }).catch(function() {
             self.showToast('OCR ไม่สำเร็จ', 'error');
         });
     }
@@ -836,6 +975,7 @@ class App {
         var priority = document.getElementById('task-priority');
         if (titleEl && !titleEl.value) titleEl.value = title;
         if (priority) priority.value = 'high';
+        this.pendingScanText = infoText || descText || '';
         var desc = document.getElementById('ocr-desc');
         var info = document.getElementById('ocr-location-info');
         var prev = document.getElementById('ocr-result-preview');
@@ -847,6 +987,7 @@ class App {
         var input = document.getElementById('task-scan-url');
         var raw = input ? String(input.value || '').trim() : '';
         if (!raw) return this.showToast('วางลิงก์ก่อน', 'warning');
+        this.pendingScanUrl = raw;
         var title = document.getElementById('task-title');
         var clean = raw.split('?')[0].split('/').filter(Boolean).pop() || raw;
         try { clean = decodeURIComponent(clean); } catch (err) {}
@@ -862,44 +1003,64 @@ class App {
     }
 
     renderCalendar() {
-        const grid = document.getElementById('calendar-days-grid'), title = document.getElementById('calendar-month-year');
+        const grid = document.getElementById('calendar-days-grid'),
+            title = document.getElementById('calendar-month-year');
         if (!grid || !title || !this.currentUser) return;
         grid.innerHTML = '';
-        const y = this.currentCalendarDate.getFullYear(), m = this.currentCalendarDate.getMonth();
-        const names = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-        title.innerText = `${names[m]} ${y + 543}`;
-        const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+        const y = this.currentCalendarDate.getFullYear(),
+            m = this.currentCalendarDate.getMonth();
+        const names = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+        title.innerText = names[m] + ' ' + (y + 543);
+        const first = new Date(y, m, 1).getDay(),
+            days = new Date(y, m + 1, 0).getDate();
+        const today = new Date();
+        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         for (let i = 0; i < first; i++) {
-            const e = document.createElement('div'); e.className = 'h-24 bg-[#e0d8c7]/40 rounded-xl'; grid.appendChild(e);
+            const e = document.createElement('div');
+            e.className = 'min-h-[92px] rounded-lg bg-black/10';
+            grid.appendChild(e);
         }
-        const tasks = this.getTasks();
+        const userEmail = this.currentUser.email;
+        const tasks = this.getTasks().filter(function(t) {
+            return t.userEmail === userEmail || (t.taggedEmails || []).indexOf(userEmail) !== -1;
+        });
+        const clean = function(v) { return String(v || '').trim().slice(0, 10); };
+        const self = this;
         for (let d = 1; d <= days; d++) {
             const cell = document.createElement('div');
-            cell.className = 'h-24 bg-white p-2 rounded-xl border border-[#c0b59f] overflow-y-auto space-y-1';
-            const ds = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            cell.innerHTML = `<div class="text-xs font-bold mb-1">${d}</div>`;
-            tasks.forEach(t => {
-                const hit = t.dueDate === ds || (t.dailyPlans && t.dailyPlans.some(function(p) { return p.date === ds; }));
-                if (!hit) return;
+            cell.className = 'min-h-[92px] rounded-lg bg-black/55 border border-white/10 p-1 space-y-1';
+            const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            const num = document.createElement('div');
+            num.className = 'text-[11px] font-bold text-white text-right';
+            num.innerHTML = ds === todayStr ? '<span class="inline-flex w-5 h-5 items-center justify-center rounded-full bg-red-600">' + d + '</span>' : String(d);
+            cell.appendChild(num);
+            tasks.forEach(function(t) {
+                var start = clean(t.startDate) || clean(t.dueDate);
+                var due = clean(t.dueDate) || clean(t.startDate);
+                var planHit = (t.dailyPlans || []).find(function(p) { return clean(p.date) === ds; });
+                if (!(start && due && ds >= start && ds <= due) && !planHit) return;
                 const el = document.createElement('div');
-                el.className = 'text-[9px] bg-[#385441] text-white p-1 rounded truncate cursor-pointer';
-                var planHit = t.dailyPlans && t.dailyPlans.find(function(p) { return p.date === ds; });
-                el.innerText = (planHit && planHit.description) ? planHit.description : t.title;
-                el.onclick = (ev) => { ev.stopPropagation(); this.openEditTaskModal(t.id); };
+                el.className = 'text-[9px] text-white p-1 rounded truncate cursor-pointer';
+                el.style.background = t.type === 'group' ? '#7c3aed' : '#2563eb';
+                el.innerText = (t.type === 'group' ? 'กลุ่ม ' : '') + ((planHit && planHit.description) ? planHit.description : t.title);
+                el.onclick = function(ev) { ev.stopPropagation();
+                    self.openEditTaskModal(t.id); };
                 cell.appendChild(el);
             });
             grid.appendChild(cell);
         }
     }
-    changeMonth(off) { this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + off); this.renderCalendar(); }
-    goToday() { this.currentCalendarDate = new Date(); this.renderCalendar(); }
+    changeMonth(off) { this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + off);
+        this.renderCalendar(); }
+    goToday() { this.currentCalendarDate = new Date();
+        this.renderCalendar(); }
 
     setTimerMode(mode) {
         this.timerMode = mode;
         this.stopTimer();
         if (mode === 'elapsed') this.timerTimeLeft = 0;
         else this.timerTimeLeft = this.getTimerSeconds(mode);
-        ['work', 'short', 'long', 'elapsed'].forEach(function (m) {
+        ['work', 'short', 'long', 'elapsed'].forEach(function(m) {
             var btn = document.getElementById('btn-pomo-' + m);
             var key = m === 'short' ? 'shortBreak' : m === 'long' ? 'longBreak' : m;
             if (btn) btn.className = mode === key ? 'px-3 py-1 bg-[#385441] text-white rounded-lg text-xs font-bold' : 'px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold';
@@ -925,14 +1086,15 @@ class App {
         var btn = document.getElementById('btn-pomo-start');
         if (btn) btn.innerText = 'พักการนับเวลา';
         var self = this;
-        this.timerInterval = setInterval(function () {
+        this.timerInterval = setInterval(function() {
             if (self.timerMode === 'elapsed') {
                 self.timerTimeLeft++;
                 self.updateTimerDisplay();
                 return;
             }
-            if (self.timerTimeLeft > 0) { self.timerTimeLeft--; self.updateTimerDisplay(); }
-            else { self.stopTimer(); self.showToast('หมดเวลา!', 'warning'); }
+            if (self.timerTimeLeft > 0) { self.timerTimeLeft--;
+                self.updateTimerDisplay(); } else { self.stopTimer();
+                self.showToast('หมดเวลา!', 'warning'); }
         }, 1000);
     }
     stopTimer() {
@@ -959,14 +1121,15 @@ class App {
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
     showToast(msg, type = 'info') {
-        const t = document.getElementById('toast'); if (!t) return;
+        const t = document.getElementById('toast');
+        if (!t) return;
         const colors = { success: 'bg-[#385441] text-white', warning: 'bg-amber-600 text-white', info: 'bg-[#2d4735] text-white', error: 'bg-red-700 text-white' };
         t.className = `fixed bottom-5 right-5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium z-50 ${colors[type] || colors.info}`;
-        t.innerText = msg; t.classList.remove('hidden');
+        t.innerText = msg;
+        t.classList.remove('hidden');
         setTimeout(() => t.classList.add('hidden'), 3000);
     }
 }
 
 let app;
-window.addEventListener('DOMContentLoaded', () => { app = new App(); });
 window.addEventListener('DOMContentLoaded', () => { app = new App(); });

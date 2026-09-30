@@ -230,6 +230,17 @@
                 </div>
                 <button type="button" onclick="app.doLogin()" class="w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold">เข้าสู่ระบบ</button>
                 <button type="button" onclick="app.doRegister()" class="w-full py-2 bg-[#e0d8c7] text-[#1f3627] rounded-xl text-xs font-bold">สมัครสมาชิก</button>
+                <button type="button" onclick="app.showForgot()" class="w-full text-[11px] text-[#385441] underline">ลืมรหัสผ่าน</button>
+                <div id="forgot-box" class="hidden space-y-2 border-t border-gray-100 pt-3">
+                    <p id="forgot-step-text" class="text-[10px] text-gray-500">กรอกอีเมลที่ใช้สมัคร ระบบจะสร้างรหัสสำรอง</p>
+                    <input type="email" id="forgot-email" placeholder="อีเมลที่ใช้สมัคร" class="w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <button type="button" onclick="app.sendResetCode()" class="w-full py-2 bg-[#e0d8c7] text-[#1f3627] rounded-xl text-xs font-bold">ส่งรหัสสำรอง</button>
+                    <input type="text" id="forgot-code" maxlength="6" placeholder="รหัสสำรอง 6 หลัก" class="hidden w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <button type="button" id="forgot-verify-btn" onclick="app.verifyResetCode()" class="hidden w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold">ยืนยันรหัส</button>
+                    <input type="password" id="forgot-new-pass" placeholder="รหัสผ่านใหม่" class="hidden w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <input type="password" id="forgot-new-pass2" placeholder="ยืนยันรหัสผ่านใหม่" class="hidden w-full text-xs border border-[#c0b59f] rounded-lg p-2">
+                    <button type="button" id="forgot-save-btn" onclick="app.saveNewPassword()" class="hidden w-full py-2 bg-[#385441] text-white rounded-xl text-xs font-bold">บันทึกรหัสใหม่</button>
+                </div>
             </form>
         </div>
     </div>
