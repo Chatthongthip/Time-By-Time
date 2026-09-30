@@ -8,11 +8,12 @@ class Entity {
 }
 
 class User extends Entity {
-    constructor(email, name, password) {
+    constructor(email, name, password, username) {
         super();
         this.email = email.toLowerCase().trim();
         this.name = name.trim();
         this.password = password;
+        this.username = String(username || '').trim().replace(/^@+/, '');
         this.createdAt = new Date().toISOString();
     }
     checkPassword(inputPassword) {
@@ -66,9 +67,7 @@ class PersonalTask extends Task {
     constructor(data = {}) {
         super(Object.assign({}, data, { type: 'personal' }));
     }
-    getDisplayType() {
-        return 'งานส่วนตัว';
-    }
+    getDisplayType() { return 'งานส่วนตัว'; }
 }
 
 class GroupTask extends Task {
@@ -77,12 +76,9 @@ class GroupTask extends Task {
         this.boardName = data.boardName || 'งานกลุ่มทั่วไป';
         this.taggedEmails = data.taggedEmails || [];
     }
-    getDisplayType() {
-        return 'งานกลุ่ม: ' + this.boardName;
-    }
+    getDisplayType() { return 'งานกลุ่ม: ' + this.boardName; }
     addMember(email) {
-        if (!this.taggedEmails.includes(email))
-            this.taggedEmails.push(email);
+        if (!this.taggedEmails.includes(email)) this.taggedEmails.push(email);
     }
 }
 
@@ -150,24 +146,34 @@ class App {
         this.checkAuth();
         if (this.currentUser) {
             try {
+                this.migrateUserData();
                 this.renderKanban();
                 this.renderCalendar();
                 this.updateGroupSelectOptions();
                 this.renderFriendsList();
                 this.updateProfileBadge();
                 this.updateUserProfileUI();
+                this.persistSession();
             } catch (err) {
                 console.error(err);
                 this.showToast('โหลดข้อมูลไม่สำเร็จ แต่ยังล็อกอินได้', 'warning');
             }
         }
+        var self = this;
+        window.addEventListener('pagehide', function() { self.persistSession(); });
+        window.addEventListener('beforeunload', function() { self.persistSession(); });
     }
 
     getUsers() {
         try {
             var raw = localStorage.getItem('tb_users');
             var data = raw ? JSON.parse(raw) : [];
-            return Array.isArray(data) ? data : [];
+            if (!Array.isArray(data)) data = [];
+            return data.map(function(u) {
+                if (!u) return u;
+                u.email = String(u.email || '').trim().toLowerCase();
+                return u;
+            }).filter(function(u) { return u && u.email; });
         } catch (err) {
             console.error(err);
             return [];
@@ -183,22 +189,184 @@ class App {
             return false;
         }
     }
-    getTasks() { return this.currentUser ? JSON.parse(localStorage.getItem('tb_tasks_' + this.currentUser.email) || '[]') : []; }
-    saveTasks(t) { if (this.currentUser) localStorage.setItem('tb_tasks_' + this.currentUser.email, JSON.stringify(t)); }
-    getFriends() { return this.currentUser ? JSON.parse(localStorage.getItem('tb_friends_' + this.currentUser.email) || '[]') : []; }
-    saveFriends(f) { if (this.currentUser) localStorage.setItem('tb_friends_' + this.currentUser.email, JSON.stringify(f)); }
+    getTasks() {
+        if (!this.currentUser) return [];
+        try {
+            var data = JSON.parse(localStorage.getItem('tb_tasks_' + this.normEmail(this.currentUser.email)) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) { return []; }
+    }
+    saveTasks(t) {
+        if (!this.currentUser) return;
+        localStorage.setItem('tb_tasks_' + this.normEmail(this.currentUser.email), JSON.stringify(t));
+        this.persistSession();
+    }
+    getFriends() {
+        if (!this.currentUser) return [];
+        try {
+            var data = JSON.parse(localStorage.getItem('tb_friends_' + this.normEmail(this.currentUser.email)) || '[]');
+            return Array.isArray(data) ? data : [];
+        } catch (e) { return []; }
+    }
+    saveFriends(f) {
+        if (!this.currentUser) return;
+        localStorage.setItem('tb_friends_' + this.normEmail(this.currentUser.email), JSON.stringify(f));
+    }
     getInvitations() { return JSON.parse(localStorage.getItem('tb_invitations') || '[]'); }
     saveInvitations(i) { localStorage.setItem('tb_invitations', JSON.stringify(i)); }
-
+    getGroupBoards() {
+        if (!this.currentUser) return [];
+        try {
+            var raw = JSON.parse(localStorage.getItem('tb_boards_' + this.normEmail(this.currentUser.email)) || '[]');
+            return Array.isArray(raw) ? raw.filter(function(n) { return !!n; }) : [];
+        } catch (e) { return []; }
+    }
+    saveGroupBoards(list) {
+        if (!this.currentUser) return;
+        localStorage.setItem('tb_boards_' + this.normEmail(this.currentUser.email), JSON.stringify(list));
+    }
+    ensureGroupBoard(name) {
+        var n = String(name || '').trim();
+        if (!n || !this.currentUser) return n;
+        var list = this.getGroupBoards();
+        if (list.indexOf(n) === -1) {
+            list.push(n);
+            this.saveGroupBoards(list);
+        }
+        return n;
+    }
+    normEmail(v) { return String(v || '').trim().toLowerCase(); }
+    findUsers(query) {
+        var q = this.normEmail(query);
+        if (!q) return [];
+        var users = this.getUsers();
+        var exact = [];
+        var fuzzy = [];
+        for (var i = 0; i < users.length; i++) {
+            var email = this.normEmail(users[i].email);
+            if (email === q) exact.push(users[i]);
+            else if (email.indexOf(q) !== -1) fuzzy.push(users[i]);
+        }
+        return exact.length ? exact : fuzzy;
+    }
+    findUser(query) {
+        var list = this.findUsers(query);
+        return list.length ? list[0] : null;
+    }
+    persistSession() {
+        if (!this.currentUser) return;
+        this.currentUser.email = this.normEmail(this.currentUser.email);
+        var rememberEl = document.getElementById('auth-remember');
+        var remember = !rememberEl || rememberEl.checked !== false;
+        localStorage.setItem('tb_last_email', this.currentUser.email);
+        if (this.currentUser.name) localStorage.setItem('tb_last_name', this.currentUser.name);
+        var raw = JSON.stringify({
+            email: this.currentUser.email,
+            name: this.currentUser.name,
+            username: this.currentUser.username || ''
+        });
+        if (remember) {
+            localStorage.setItem('tb_current_user', raw);
+            sessionStorage.removeItem('tb_current_user');
+        } else {
+            sessionStorage.setItem('tb_current_user', raw);
+            localStorage.removeItem('tb_current_user');
+        }
+    }
+    migrateUserData() {
+        if (!this.currentUser) return;
+        var email = this.normEmail(this.currentUser.email);
+        this.currentUser.email = email;
+        var prefixes = ['tb_tasks_', 'tb_friends_', 'tb_boards_'];
+        var keys = [];
+        for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+        for (var p = 0; p < prefixes.length; p++) {
+            var prefix = prefixes[p];
+            var target = prefix + email;
+            var merged = [];
+            try { merged = JSON.parse(localStorage.getItem(target) || '[]'); } catch (e) { merged = []; }
+            if (!Array.isArray(merged)) merged = [];
+            keys.forEach(function(k) {
+                if (!k || k.indexOf(prefix) !== 0) return;
+                var keyEmail = String(k.slice(prefix.length) || '').trim().toLowerCase();
+                try {
+                    var extra = JSON.parse(localStorage.getItem(k) || '[]');
+                    if (!Array.isArray(extra)) return;
+                    extra.forEach(function(item) {
+                        if (prefix === 'tb_tasks_') {
+                            var owner = String((item && item.userEmail) || '').trim().toLowerCase();
+                            if (owner !== email && keyEmail !== email) return;
+                            if (item && item.id && !merged.some(function(t) { return t && t.id === item.id; })) merged.push(item);
+                        } else if (keyEmail === email && merged.indexOf(item) === -1) {
+                            merged.push(item);
+                        }
+                    });
+                } catch (err) {}
+            });
+            localStorage.setItem(target, JSON.stringify(merged));
+        }
+    }
+    afterLoginSuccess(msg) {
+        this.persistSession();
+        this.migrateUserData();
+        var modal = document.getElementById('auth-modal');
+        if (modal) modal.classList.add('hidden');
+        this.updateUserProfileUI();
+        this.renderKanban();
+        this.renderCalendar();
+        this.updateGroupSelectOptions();
+        this.renderFriendsList();
+        this.updateProfileBadge();
+        this.showToast(msg, 'success');
+    }
     loadCurrentUser() {
-        const s = localStorage.getItem('tb_current_user');
-        if (s) this.currentUser = JSON.parse(s);
+        try {
+            var s = localStorage.getItem('tb_current_user') || sessionStorage.getItem('tb_current_user');
+            if (s) {
+                this.currentUser = JSON.parse(s);
+                if (this.currentUser && this.currentUser.email) this.currentUser.email = this.normEmail(this.currentUser.email);
+                else this.currentUser = null;
+            }
+        } catch (e) { this.currentUser = null; }
     }
     checkAuth() {
         const m = document.getElementById('auth-modal');
-        if (!this.currentUser) { if (m) m.classList.remove('hidden'); } else { if (m) m.classList.add('hidden'); }
+        if (!this.currentUser) {
+            if (m) m.classList.remove('hidden');
+            var last = localStorage.getItem('tb_last_email');
+            var emailEl = document.getElementById('auth-email');
+            if (last && emailEl && !emailEl.value) emailEl.value = last;
+            this.renderSavedAccounts();
+        } else {
+            if (m) m.classList.add('hidden');
+            this.migrateUserData();
+        }
     }
-
+    renderSavedAccounts() {
+        var box = document.getElementById('saved-accounts-box');
+        if (!box) return;
+        var users = this.getUsers();
+        if (!users.length) {
+            box.innerHTML = 'ยังไม่มีบัญชีบนเครื่องนี้ กดสมัครสมาชิกก่อน';
+            return;
+        }
+        var html = 'บัญชีบนเครื่องนี้ (กดเพื่อกรอกอัตโนมัติ): ';
+        users.forEach(function(u, idx) {
+            html += (idx ? ' , ' : '') + '<button type="button" class="underline text-[#385441]" onclick="app.fillLoginAccount(\'' + this.escapeHtml(u.email) + '\')">' + this.escapeHtml(u.name || u.email) + '</button>';
+        }.bind(this));
+        box.innerHTML = html;
+    }
+    fillLoginAccount(email) {
+        var emailEl = document.getElementById('auth-email');
+        if (emailEl) emailEl.value = email;
+        this.authMode = 'login';
+        var nameBox = document.getElementById('auth-name-box');
+        var userBox = document.getElementById('auth-username-box');
+        if (nameBox) nameBox.classList.add('hidden');
+        if (userBox) userBox.classList.add('hidden');
+        var passEl = document.getElementById('auth-password');
+        if (passEl) passEl.focus();
+    }
     switchAuthMode(mode) {
         this.authMode = mode;
         var isReg = mode === 'register';
@@ -207,23 +375,25 @@ class App {
         var title = document.getElementById('auth-title');
         var desc = document.getElementById('auth-desc-text');
         var nameBox = document.getElementById('auth-name-box');
+        var userBox = document.getElementById('auth-username-box');
         if (title) title.innerText = isReg ? 'สมัครสมาชิก TimeByTime' : 'เข้าสู่ระบบ TimeByTime';
         if (desc) desc.innerText = isReg ? 'กรอกชื่อ อีเมล และรหัสผ่านเพื่อสร้างบัญชีใหม่' : 'กรอกอีเมลและรหัสผ่านเพื่อเข้าใช้งาน';
         if (nameBox) {
             if (isReg) nameBox.classList.remove('hidden');
             else nameBox.classList.add('hidden');
         }
+        if (userBox) userBox.classList.add('hidden');
     }
-
     doLogin() {
         this.authMode = 'login';
         var nameBox = document.getElementById('auth-name-box');
         if (nameBox) nameBox.classList.add('hidden');
+        var userBox = document.getElementById('auth-username-box');
+        if (userBox) userBox.classList.add('hidden');
         var title = document.getElementById('auth-title');
         if (title) title.innerText = 'เข้าสู่ระบบ TimeByTime';
         this.handleAuthSubmit();
     }
-
     doRegister() {
         this.authMode = 'register';
         var nameBox = document.getElementById('auth-name-box');
@@ -231,6 +401,8 @@ class App {
         var title = document.getElementById('auth-title');
         if (title) title.innerText = 'สมัครสมาชิก TimeByTime';
         if (nameBox) nameBox.classList.remove('hidden');
+        var userBox = document.getElementById('auth-username-box');
+        if (userBox) userBox.classList.add('hidden');
         if (!nameEl || !String(nameEl.value || '').trim()) {
             this.showToast('กรอกชื่อ แล้วกดสมัครสมาชิกอีกครั้ง', 'warning');
             if (nameEl) nameEl.focus();
@@ -238,24 +410,18 @@ class App {
         }
         this.handleAuthSubmit();
     }
-
     handleAuthSubmit(e) {
         if (e && e.preventDefault) e.preventDefault();
-
         var emailEl = document.getElementById('auth-email');
         var passEl = document.getElementById('auth-password');
         var nameEl = document.getElementById('auth-name');
-
         var email = emailEl ? String(emailEl.value || '').trim().toLowerCase() : '';
         var password = passEl ? String(passEl.value || '') : '';
-
         if (!email || !password) {
             this.showToast('กรุณากรอกอีเมลและรหัสผ่าน', 'warning');
             return false;
         }
-
         var users = this.getUsers();
-
         if (this.authMode === 'register') {
             var name = nameEl ? String(nameEl.value || '').trim() : '';
             if (!name) {
@@ -265,7 +431,6 @@ class App {
                 if (nameEl) nameEl.focus();
                 return false;
             }
-
             for (var i = 0; i < users.length; i++) {
                 if (users[i].email === email) {
                     this.showToast('อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบ', 'warning');
@@ -273,43 +438,26 @@ class App {
                     return false;
                 }
             }
-
             var userObj = new User(email, name, password);
             var newUser = {
                 id: userObj.id,
                 email: userObj.email,
                 name: userObj.name,
+                username: userObj.username || '',
                 password: userObj.password,
                 createdAt: userObj.createdAt
             };
             if (!userObj.checkPassword(password)) return false;
             users.push(newUser);
             if (!this.saveUsers(users)) return false;
-
-            this.currentUser = { email: newUser.email, name: newUser.name };
-            try {
-                localStorage.setItem('tb_current_user', JSON.stringify(this.currentUser));
-            } catch (err) {
-                this.showToast('บันทึก session ไม่สำเร็จ', 'error');
-                return false;
-            }
-
-            var modal = document.getElementById('auth-modal');
-            if (modal) modal.classList.add('hidden');
-            this.updateUserProfileUI();
-            this.renderKanban();
-            this.renderCalendar();
-            this.renderFriendsList();
-            this.updateProfileBadge();
-            this.showToast('สมัครสมาชิกสำเร็จ! ยินดีต้อนรับ ' + name, 'success');
+            this.currentUser = { email: newUser.email, name: newUser.name, username: newUser.username || '' };
+            this.afterLoginSuccess('สมัครสมาชิกสำเร็จ! ยินดีต้อนรับ ' + name);
             return false;
         }
-
         var found = null;
         for (var j = 0; j < users.length; j++) {
             if (users[j].email === email) { found = users[j]; break; }
         }
-
         if (!found) {
             this.showToast('ไม่พบบัญชีนี้ กรุณากรอกชื่อแล้วกดสมัครสมาชิก', 'warning');
             this.authMode = 'register';
@@ -321,32 +469,15 @@ class App {
             if (nameEl) nameEl.focus();
             return false;
         }
-
         var loginUser = new User(found.email, found.name, found.password);
         if (!loginUser.checkPassword(password)) {
             this.showToast('รหัสผ่านไม่ถูกต้อง', 'error');
             return false;
         }
-
-        this.currentUser = { email: found.email, name: found.name };
-        try {
-            localStorage.setItem('tb_current_user', JSON.stringify(this.currentUser));
-        } catch (err) {
-            this.showToast('บันทึก session ไม่สำเร็จ', 'error');
-            return false;
-        }
-
-        var modal2 = document.getElementById('auth-modal');
-        if (modal2) modal2.classList.add('hidden');
-        this.updateUserProfileUI();
-        this.renderKanban();
-        this.renderCalendar();
-        this.renderFriendsList();
-        this.updateProfileBadge();
-        this.showToast('เข้าสู่ระบบสำเร็จ!', 'success');
+        this.currentUser = { email: found.email, name: found.name, username: found.username || '' };
+        this.afterLoginSuccess('เข้าสู่ระบบสำเร็จ!');
         return false;
     }
-
     showForgot() {
         var box = document.getElementById('forgot-box');
         if (box) box.classList.remove('hidden');
@@ -404,10 +535,8 @@ class App {
         var users = this.getUsers();
         var ok = false;
         for (var i = 0; i < users.length; i++) {
-            if (users[i].email === this.resetEmail) {
-                users[i].password = p1;
-                ok = true;
-            }
+            if (users[i].email === this.resetEmail) { users[i].password = p1;
+                ok = true; }
         }
         if (!ok || !this.saveUsers(users)) return this.showToast('บันทึกรหัสไม่สำเร็จ', 'error');
         var resets = {};
@@ -423,10 +552,13 @@ class App {
         this.authMode = 'login';
         this.showToast('ตั้งรหัสใหม่แล้ว เข้าสู่ระบบได้เลย', 'success');
     }
-
     handleLogout() {
-        if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
+        if (confirm('ออกจากระบบ?\nข้อมูลงานจะยังอยู่กับบัญชีนี้ เมื่อล็อกอินอีเมลเดิมจะกลับมาครบ')) {
+            if (this.currentUser && this.currentUser.email) {
+                localStorage.setItem('tb_last_email', this.normEmail(this.currentUser.email));
+            }
             localStorage.removeItem('tb_current_user');
+            sessionStorage.removeItem('tb_current_user');
             this.currentUser = null;
             location.reload();
         }
@@ -435,7 +567,6 @@ class App {
         const el = document.getElementById('user-display-name');
         if (el && this.currentUser) el.innerText = this.currentUser.name;
     }
-
     switchView(view) {
         this.activeView = view;
         ['kanban', 'calendar', 'pomodoro', 'team'].forEach(function(v) {
@@ -447,7 +578,6 @@ class App {
         if (view === 'calendar') this.renderCalendar();
         if (view === 'team') this.renderFriendsList();
     }
-
     setBoardType(type) {
         this.activeBoardType = type;
         var bp = document.getElementById('btn-board-personal');
@@ -456,14 +586,16 @@ class App {
         if (bp) bp.classList.toggle('active', type === 'personal');
         if (bg) bg.classList.toggle('active', type === 'group');
         if (gc) gc.classList.toggle('hidden', type !== 'group');
+        if (type === 'group') this.updateGroupSelectOptions();
         this.renderKanban();
     }
-
     getFriendRequests() {
         try { return JSON.parse(localStorage.getItem('tb_friend_requests') || '[]'); } catch (e) { return []; }
     }
     saveFriendRequests(list) { localStorage.setItem('tb_friend_requests', JSON.stringify(list)); }
     addFriendBoth(a, b) {
+        a = this.normEmail(a);
+        b = this.normEmail(b);
         var keyA = 'tb_friends_' + a,
             keyB = 'tb_friends_' + b;
         var fa = JSON.parse(localStorage.getItem(keyA) || '[]');
@@ -474,30 +606,31 @@ class App {
         localStorage.setItem(keyB, JSON.stringify(fb));
     }
     handleAddFriend(e) {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         if (!this.currentUser) return;
-        const email = document.getElementById('friend-email-input').value.trim().toLowerCase();
-        if (!email) return;
-        if (!this.getUsers().find(u => u.email === email)) return this.showToast('เพิ่มได้เฉพาะบัญชีที่สมัครแล้วเท่านั้น', 'warning');
-        if (email === this.currentUser.email) return this.showToast('ไม่สามารถเพิ่มตัวเองได้', 'warning');
+        const raw = document.getElementById('friend-email-input').value.trim();
+        if (!raw) return this.showToast('กรอกอีเมลที่เพื่อนใช้สมัครแล้ว', 'warning');
+        const matches = this.findUsers(raw);
+        if (!matches.length) {
+            var names = this.getUsers().map(function(u) { return u.email; }).join(', ');
+            return this.showToast(names ? ('ไม่พบอีเมลนี้ในระบบ บัญชีที่มีอยู่: ' + names) : 'ไม่พบอีเมลนี้ เพื่อนต้องสมัครในเบราว์เซอร์นี้ก่อน', 'warning');
+        }
+        if (matches.length > 1) {
+            return this.showToast('เจอหลายบัญชี: ' + matches.map(function(u) { return u.email; }).join(', ') + ' ใส่ให้ครบ', 'warning');
+        }
+        this.addLocalFriend(matches[0].email);
+    }
+    addLocalFriend(email) {
+        if (!this.currentUser) return;
+        email = this.normEmail(email);
+        if (email === this.normEmail(this.currentUser.email)) return this.showToast('ไม่สามารถเพิ่มตัวเองได้', 'warning');
         if (this.getFriends().indexOf(email) !== -1) return this.showToast('เป็นเพื่อนกันอยู่แล้ว', 'warning');
-        var reqs = this.getFriendRequests();
-        var dup = reqs.find(function(r) {
-            return r.status === 'pending' && ((r.fromEmail === this.currentUser.email && r.toEmail === email) || (r.fromEmail === email && r.toEmail === this.currentUser.email));
-        }.bind(this));
-        if (dup) return this.showToast('มีคำขอที่รอตอบรับอยู่แล้ว', 'warning');
-        reqs.push({
-            id: 'fr_' + Date.now().toString(36),
-            fromEmail: this.currentUser.email,
-            fromName: this.currentUser.name,
-            toEmail: email,
-            status: 'pending'
-        });
-        this.saveFriendRequests(reqs);
-        document.getElementById('friend-email-input').value = '';
+        this.addFriendBoth(this.currentUser.email, email);
+        var input = document.getElementById('friend-email-input');
+        if (input) input.value = '';
         this.renderFriendsList();
         this.updateProfileBadge();
-        this.showToast('ส่งคำขอแล้ว ให้เพื่อนออกแล้วล็อกอินบัญชีตัวเอง เปิดเมนูทีม จะเห็นจุดแดง', 'success');
+        this.showToast('เพิ่มเพื่อนแล้ว: ' + email, 'success');
     }
     respondFriendRequest(id, accept) {
         var reqs = this.getFriendRequests();
@@ -511,10 +644,10 @@ class App {
     }
     removeFriend(email) {
         if (!confirm('ลบ ' + email + ' ออกจากเพื่อน?')) return;
-        var me = this.currentUser.email;
-        var mine = this.getFriends().filter(function(f) { return f !== email; });
-        this.saveFriends(mine);
-        var theirs = JSON.parse(localStorage.getItem('tb_friends_' + email) || '[]').filter(function(f) { return f !== me; });
+        var me = this.normEmail(this.currentUser.email);
+        email = this.normEmail(email);
+        this.saveFriends(this.getFriends().filter(function(f) { return this.normEmail(f) !== email; }.bind(this)));
+        var theirs = JSON.parse(localStorage.getItem('tb_friends_' + email) || '[]').filter(function(f) { return String(f).toLowerCase() !== me; });
         localStorage.setItem('tb_friends_' + email, JSON.stringify(theirs));
         this.renderFriendsList();
         this.showToast('ลบเพื่อนแล้ว', 'info');
@@ -537,16 +670,36 @@ class App {
                 list.innerHTML = html;
             }
         }
+        this.renderLocalAccounts();
         this.renderFriendRequests();
         this.renderTeamInvitations();
         this.updateTaskFriendSelectOptions();
     }
+    renderLocalAccounts() {
+        var box = document.getElementById('local-accounts-list');
+        if (!box) return;
+        var me = this.currentUser ? this.normEmail(this.currentUser.email) : '';
+        var others = this.getUsers().filter(function(u) { return this.normEmail(u.email) !== me; }.bind(this));
+        if (!others.length) {
+            box.innerHTML = 'ยังไม่มีบัญชีอื่นบนเครื่องนี้<br>ให้เพื่อนมากดสมัครในเบราว์เซอร์นี้ก่อน แล้วค่อยใส่อีเมลเพื่อน';
+            return;
+        }
+        var html = '<div class="space-y-1">';
+        others.forEach(function(u) {
+            html += '<div class="flex items-center justify-between gap-2">' +
+                '<span>' + this.escapeHtml(u.name || u.email) + ' <span class="text-gray-500">(' + this.escapeHtml(u.email) + ')</span></span>' +
+                '<button type="button" onclick="app.addLocalFriend(\'' + this.escapeHtml(u.email) + '\')" class="px-2 py-1 bg-[#385441] text-white rounded-lg text-[10px] font-bold">เพิ่ม</button>' +
+                '</div>';
+        }.bind(this));
+        html += '</div>';
+        box.innerHTML = html;
+    }
     renderFriendRequests() {
         var box = document.getElementById('friend-requests-list');
         if (!box || !this.currentUser) return;
-        var me = this.currentUser.email;
-        var incoming = this.getFriendRequests().filter(function(r) { return r.toEmail === me && r.status === 'pending'; });
-        var outgoing = this.getFriendRequests().filter(function(r) { return r.fromEmail === me && r.status === 'pending'; });
+        var me = this.normEmail(this.currentUser.email);
+        var incoming = this.getFriendRequests().filter(function(r) { return this.normEmail(r.toEmail) === me && r.status === 'pending'; }.bind(this));
+        var outgoing = this.getFriendRequests().filter(function(r) { return this.normEmail(r.fromEmail) === me && r.status === 'pending'; }.bind(this));
         var html = '';
         incoming.forEach(function(r) {
             html += '<div class="p-2.5 bg-white/70 rounded-xl border border-[#c0b59f]/60 space-y-1">' +
@@ -567,21 +720,19 @@ class App {
         var my = this.getInvitations().filter(function(i) { return i.targetEmail === this.currentUser.email && i.status === 'pending'; }.bind(this));
         box.innerHTML = my.length ? my.map(function(inv) {
             return '<div class="p-2.5 bg-white/70 rounded-xl border border-[#c0b59f]/60 space-y-1">' +
-                '<div class="text-xs font-bold">' + this.escapeHtml(inv.taskTitle) + '</div>' +
+                '<div class="text-xs font-semibold">' + this.escapeHtml(inv.taskTitle) + '</div>' +
                 '<div class="text-[10px] text-gray-600">จาก ' + this.escapeHtml(inv.senderEmail) + ' | บอร์ด ' + this.escapeHtml(inv.boardName || '') + '</div>' +
                 '<div class="flex gap-2 justify-end">' +
-                '<button onclick="app.respondInvitation(\'' + inv.id + '\', \'accepted\')" class="px-3 py-1 bg-[#385441] text-white text-xs rounded-lg">ยอมรับ</button>' +
-                '<button onclick="app.respondInvitation(\'' + inv.id + '\', \'rejected\')" class="px-3 py-1 bg-gray-200 text-xs rounded-lg">ปฏิเสธ</button>' +
-                '</div></div>';
+                '<button onclick="app.respondInvitation(\'' + inv.id + '\', true)" class="px-3 py-1 bg-[#385441] text-white text-xs rounded-lg">ยอมรับ</button>' +
+                '<button onclick="app.respondInvitation(\'' + inv.id + '\', false)" class="px-3 py-1 bg-gray-200 text-xs rounded-lg">ปฏิเสธ</button></div></div>';
         }.bind(this)).join('') : '<div class="text-xs text-gray-600 py-3 text-center">ไม่มีคำเชิญบอร์ด</div>';
     }
     updateTaskFriendSelectOptions() {
-        const select = document.getElementById('task-friend-select');
-        if (!select) return;
-        select.innerHTML = '<option value="">-- เลือกเพื่อน --</option>' +
-            this.getFriends().map(e => `<option value="${e}">${e}</option>`).join('');
+        var sel = document.getElementById('task-friend-select');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">-- เลือกเพื่อนจากรายชื่อ --</option>' +
+            this.getFriends().map(function(e) { return '<option value="' + e + '">' + e + '</option>'; }).join('');
     }
-
     openProfileModal() {
         if (!this.currentUser) return;
         document.getElementById('profile-modal-name').innerText = this.currentUser.name;
@@ -591,108 +742,73 @@ class App {
     }
     closeProfileModal() { document.getElementById('profile-modal').classList.add('hidden'); }
     renderProfileInvitations() {
-        const list = document.getElementById('profile-invitations-list');
-        if (!list) return;
-        const my = this.getInvitations().filter(i => i.targetEmail === this.currentUser.email && i.status === 'pending');
-        list.innerHTML = my.length ? my.map(inv => `
-            <div class="p-3 bg-white rounded-xl border border-[#c0b59f] space-y-2">
-                <h5 class="text-xs font-bold">${this.escapeHtml(inv.taskTitle)}</h5>
-                <p class="text-[10px] text-gray-500">จาก: ${this.escapeHtml(inv.senderEmail)}</p>
-                <div class="flex gap-2 justify-end">
-                    <button onclick="app.respondInvitation('${inv.id}','accepted')" class="px-3 py-1 bg-[#385441] text-white text-xs rounded-lg">ยอมรับ</button>
-                    <button onclick="app.respondInvitation('${inv.id}','rejected')" class="px-3 py-1 bg-gray-200 text-xs rounded-lg">ปฏิเสธ</button>
-                </div>
-            </div>`).join('') : '<div class="text-xs text-gray-500 py-3 text-center">ไม่มีคำเชิญ</div>';
-    }
-    respondInvitation(id, status) {
-        const invites = this.getInvitations();
-        const i = invites.findIndex(x => x.id === id);
-        if (i !== -1) {
-            invites[i].status = status;
-            this.saveInvitations(invites);
-        }
-        this.renderProfileInvitations();
-        this.updateProfileBadge();
-        this.renderKanban();
-        this.showToast(status === 'accepted' ? 'ตอบรับแล้ว' : 'ปฏิเสธแล้ว', 'info');
+        var box = document.getElementById('profile-invitations-list');
+        if (!box || !this.currentUser) return;
+        const my = this.getInvitations().filter(function(i) { return i.targetEmail === this.currentUser.email && i.status === 'pending'; }.bind(this));
+        box.innerHTML = my.length ? my.map(function(inv) {
+            return '<div class="p-2.5 bg-white/70 rounded-xl border border-[#c0b59f]/60 space-y-1">' +
+                '<div class="text-xs font-semibold">' + this.escapeHtml(inv.taskTitle) + '</div>' +
+                '<div class="text-[10px] text-gray-600">จาก ' + this.escapeHtml(inv.senderEmail) + '</div></div>';
+        }.bind(this)).join('') : '<div class="text-xs text-gray-600 py-3 text-center">ไม่มีคำเชิญ</div>';
     }
     updateProfileBadge() {
         if (!this.currentUser) return;
-        const n = this.getInvitations().filter(i => i.targetEmail === this.currentUser.email && i.status === 'pending').length;
-        const badge = document.getElementById('profile-invite-badge');
-        if (badge) badge.classList.toggle('hidden', n === 0);
+        const n = this.getInvitations().filter(function(i) { return i.targetEmail === this.currentUser.email && i.status === 'pending'; }.bind(this)).length;
         var fr = this.getFriendRequests().filter(function(r) { return r.toEmail === this.currentUser.email && r.status === 'pending'; }.bind(this)).length;
-        var teamBadge = document.getElementById('team-request-badge');
+        var badge = document.getElementById('team-request-badge');
+        var pBadge = document.getElementById('profile-invite-badge');
         var total = n + fr;
-        if (teamBadge) {
-            teamBadge.innerText = String(total);
-            teamBadge.classList.toggle('hidden', total === 0);
+        if (badge) {
+            badge.innerText = String(total);
+            badge.classList.toggle('hidden', total === 0);
         }
+        if (pBadge) pBadge.classList.toggle('hidden', n === 0);
     }
-
-    renderKanban() {
-        if (!this.currentUser) return;
+    respondInvitation(id, accept) {
+        var inv = this.getInvitations();
+        var i = inv.findIndex(function(x) { return x.id === id; });
+        if (i === -1) return;
+        inv[i].status = accept ? 'accepted' : 'rejected';
+        this.saveInvitations(inv);
+        this.renderFriendsList();
+        this.updateProfileBadge();
+        this.showToast(accept ? 'ยอมรับคำเชิญแล้ว' : 'ปฏิเสธคำเชิญแล้ว', 'info');
+    }
+    getVisibleTasks() {
+        if (!this.currentUser) return [];
         const userEmail = this.currentUser.email;
-        let filtered = this.getTasks().filter(t => {
-            var mine = t.userEmail === userEmail || (t.taggedEmails || []).includes(userEmail);
-            if (!mine) return false;
+        return this.getTasks().filter(function(t) {
             if (this.activeBoardType === 'personal') return t.type === 'personal';
             if (t.type !== 'group') return false;
             return !this.activeGroup || t.boardName === this.activeGroup;
-        });
-        const cols = { todo: [], doing: [], done: [] };
-        filtered.forEach(t => { if (cols[t.status]) cols[t.status].push(t); });
-        ['todo', 'doing', 'done'].forEach(st => {
-            const c = document.getElementById('col-' + st),
-                b = document.getElementById('badge-' + st);
-            if (!c) return;
-            c.innerHTML = '';
-            if (b) b.innerText = cols[st].length;
-            cols[st].forEach(t => c.appendChild(this.createTaskCard(t)));
-        });
-        this.updateGroupSelectOptions();
-        if (!window.__tbOutside) {
-            window.__tbOutside = true;
-            document.addEventListener('click', function(ev) {
-                if (!ev.target.closest('#col-todo, #col-doing, #col-done')) {
-                    document.querySelectorAll('.task-detail').forEach(function(el) { el.classList.add('hidden'); });
-                }
-            });
-        }
+        }.bind(this));
     }
-
+    renderKanban() {
+        this.updateGroupSelectOptions();
+        var tasks = this.getVisibleTasks();
+        ['todo', 'doing', 'done'].forEach(function(st) {
+            var col = document.getElementById('col-' + st);
+            var badge = document.getElementById('badge-' + st);
+            if (!col) return;
+            var list = tasks.filter(function(t) { return t.status === st; });
+            col.innerHTML = '';
+            list.forEach(function(task) { col.appendChild(this.createTaskCard(task)); }.bind(this));
+            if (badge) badge.innerText = String(list.length);
+        }.bind(this));
+    }
     createTaskCard(task) {
-        const card = document.createElement('div');
-        card.className = 'p-3 bg-white rounded-xl border border-[#c0b59f] shadow-sm cursor-pointer space-y-1.5';
-        const pri = { low: ['bg-emerald-100 text-emerald-800', 'ทั่วไป'], medium: ['bg-amber-100 text-amber-800', 'ปานกลาง'], high: ['bg-red-100 text-red-800', 'ด่วน'] };
-        const pc = (pri[task.priority] || pri.medium)[0];
-        const pt = (pri[task.priority] || pri.medium)[1];
-        let plans = '';
-        if (task.dailyPlans && task.dailyPlans.length) {
-            plans = '<div class="text-[9px] font-bold text-[#385441]">แผน AI</div>' +
-                task.dailyPlans.slice(0, 3).map(p => '<div class="text-[9px] text-gray-600 truncate">• ' + p.date + ': ' + this.escapeHtml(p.description) + '</div>').join('');
-        }
-        let scan = '';
-        if (task.scanText || task.scanUrl || task.scanFile) {
-            scan = '<div class="text-[9px] font-bold text-[#385441] mt-1">รายละเอียดที่สแกน</div>' +
-                (task.scanText ? '<div class="text-[10px] text-gray-700 whitespace-pre-wrap">' + this.escapeHtml(task.scanText) + '</div>' : '') +
-                (task.scanFile ? '<div class="text-[10px] text-gray-500">ไฟล์: ' + this.escapeHtml(task.scanFile) + '</div>' : '') +
-                (task.scanUrl ? '<a href="' + this.escapeHtml(task.scanUrl) + '" target="_blank" class="text-[10px] text-blue-700 underline break-all">' + this.escapeHtml(task.scanUrl) + '</a>' : '');
-        }
-        card.innerHTML = '<div class="flex justify-between"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + pc + '">' + pt + '</span>' +
-            (task.dueDate ? '<span class="text-[10px] text-gray-500">' + this.escapeHtml(task.dueDate) + '</span>' : '') + '</div>' +
-            '<h4 class="text-xs font-bold text-[#1f3627] truncate">' + this.escapeHtml(task.title) + '</h4>' +
-            (task.type === 'group' && task.boardName ? '<div class="text-[9px] text-[#385441] bg-[#e0d8c7] inline-block px-1.5 py-0.5 rounded font-bold">' + this.escapeHtml(task.boardName) + '</div>' : '') +
-            '<div class="text-[9px] text-gray-400">คลิกเพื่อดูรายละเอียด</div>' +
-            '<div class="task-detail hidden mt-2 pt-2 border-t border-gray-100 space-y-1">' + plans + scan +
-            '<button type="button" class="edit-task text-[10px] font-bold text-[#385441] underline">แก้ไขงาน</button></div>';
         var self = this;
-        card.onclick = function(ev) {
-            if (ev.target.closest('a') || ev.target.closest('.edit-task')) return;
-            document.querySelectorAll('.task-detail').forEach(function(el) {
-                if (el !== card.querySelector('.task-detail')) el.classList.add('hidden');
-            });
-            card.querySelector('.task-detail').classList.toggle('hidden');
+        var card = document.createElement('div');
+        card.className = 'bg-white rounded-xl p-3 border border-[#c0b59f] shadow-sm space-y-1 cursor-pointer';
+        card.innerHTML =
+            '<div class="text-xs font-bold text-[#1f3627]">' + this.escapeHtml(task.title) + '</div>' +
+            (task.type === 'group' && task.boardName ? '<div class="text-[9px] text-[#385441] bg-[#e0d8c7] inline-block px-1.5 py-0.5 rounded font-bold">' + this.escapeHtml(task.boardName) + '</div>' : '') +
+            '<div class="text-[10px] text-gray-500">' + this.escapeHtml((task.startDate || '') + (task.dueDate ? ' → ' + task.dueDate : '')) + '</div>' +
+            '<div class="task-detail hidden text-[10px] text-gray-600 pt-1">' + this.escapeHtml(task.scanText || task.getDisplayType && task.getDisplayType() || task.type) + '</div>' +
+            '<button type="button" class="edit-task text-[10px] text-[#385441] font-bold">แก้ไข</button>';
+        card.onclick = function() {
+            var d = card.querySelector('.task-detail');
+            if (d) d.classList.toggle('hidden');
         };
         card.querySelector('.edit-task').onclick = function(ev) {
             ev.stopPropagation();
@@ -700,22 +816,30 @@ class App {
         };
         return card;
     }
-
     updateGroupSelectOptions() {
         const select = document.getElementById('group-select'),
             modal = document.getElementById('task-board-name');
-        if (!select) return;
-        const userEmail = this.currentUser.email,
-            groups = new Set();
-        this.getTasks().forEach(t => {
+        if (!select || !this.currentUser) return;
+        const userEmail = this.currentUser.email;
+        const groups = new Set(this.getGroupBoards());
+        this.getTasks().forEach(function(t) {
             if (t.type === 'group' && t.boardName && (t.userEmail === userEmail || (t.taggedEmails || []).includes(userEmail))) groups.add(t.boardName);
         });
+        if (!groups.has('งานกลุ่มทั่วไป')) groups.add('งานกลุ่มทั่วไป');
+        const prevSelect = this.activeGroup || select.value || '';
+        const prevModal = modal ? modal.value : '';
         select.innerHTML = '<option value="">-- บอร์ดกลุ่มทั้งหมด --</option>';
-        if (modal) modal.innerHTML = '<option value="งานกลุ่มทั่วไป">งานกลุ่มทั่วไป</option>';
-        groups.forEach(g => {
+        if (modal) modal.innerHTML = '';
+        Array.from(groups).sort().forEach(function(g) {
             select.appendChild(new Option(g, g));
             if (modal) modal.appendChild(new Option(g, g));
         });
+        if (prevSelect) select.value = prevSelect;
+        this.activeGroup = select.value;
+        if (modal) {
+            if (prevModal) modal.value = prevModal;
+            else if (this.activeGroup) modal.value = this.activeGroup;
+        }
     }
     handleGroupChange(v) {
         this.activeGroup = v;
@@ -724,15 +848,40 @@ class App {
     addNewGroupBoard() {
         const name = prompt('ชื่อบอร์ดกลุ่มใหม่:');
         if (!name || !String(name).trim()) return;
-        this.activeGroup = name.trim();
+        const boardName = this.ensureGroupBoard(String(name).trim());
+        this.activeGroup = boardName;
         this.updateGroupSelectOptions();
-        document.getElementById('group-select').value = this.activeGroup;
+        const sel = document.getElementById('group-select');
+        if (sel) sel.value = boardName;
+        this.activeGroup = boardName;
         this.renderKanban();
-        this.showToast(`สร้างบอร์ด "${this.activeGroup}" สำเร็จ`, 'success');
+        this.showToast('สร้างบอร์ด "' + boardName + '" สำเร็จ', 'success');
     }
-
+    deleteGroupBoard() {
+        var sel = document.getElementById('group-select');
+        var name = (sel && sel.value) || this.activeGroup || '';
+        if (!name) return this.showToast('เลือกบอร์ดกลุ่มที่ต้องการลบก่อน', 'warning');
+        if (name === 'งานกลุ่มทั่วไป') return this.showToast('ไม่สามารถลบบอร์ดเริ่มต้นได้', 'warning');
+        if (!confirm('ลบบอร์ดกลุ่ม "' + name + '" ?\nงานในบอร์ดนี้จะถูกย้ายไป "งานกลุ่มทั่วไป"')) return;
+        var boards = this.getGroupBoards().filter(function(b) { return b !== name; });
+        this.saveGroupBoards(boards);
+        var tasks = this.getTasks().map(function(t) {
+            if (t.type === 'group' && t.boardName === name) t.boardName = 'งานกลุ่มทั่วไป';
+            return t;
+        });
+        this.saveTasks(tasks);
+        this.activeGroup = '';
+        this.updateGroupSelectOptions();
+        var sel2 = document.getElementById('group-select');
+        if (sel2) sel2.value = '';
+        this.renderKanban();
+        this.showToast('ลบบอร์ดกลุ่ม "' + name + '" แล้ว', 'info');
+    }
     openTaskModal() {
-        ['task-id', 'task-title', 'task-start-date', 'task-due-date'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        ['task-id', 'task-title', 'task-start-date', 'task-due-date'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
         document.getElementById('task-priority').value = 'medium';
         document.getElementById('task-status').value = 'todo';
         document.getElementById('task-type').value = this.activeBoardType;
@@ -740,6 +889,7 @@ class App {
         this.currentTaskMembers = [];
         this.renderTaskTaggedMembers();
         this.updateTaskFriendSelectOptions();
+        this.updateGroupSelectOptions();
         this.toggleTaskTypeFields(this.activeBoardType);
         var ocrPrev = document.getElementById('ocr-result-preview');
         var delBtn = document.getElementById('btn-delete-task');
@@ -748,7 +898,7 @@ class App {
         document.getElementById('task-modal').classList.remove('hidden');
     }
     openEditTaskModal(id) {
-        const task = this.getTasks().find(t => t.id === id);
+        const task = this.getTasks().find(function(t) { return t.id === id; });
         if (!task) return;
         document.getElementById('task-id').value = task.id;
         document.getElementById('task-title').value = task.title;
@@ -761,6 +911,7 @@ class App {
         this.currentTaskMembers = task.taggedEmails || [];
         this.renderTaskTaggedMembers();
         this.updateTaskFriendSelectOptions();
+        this.updateGroupSelectOptions();
         this.toggleTaskTypeFields(task.type || 'personal');
         if (task.type === 'group' && task.boardName) {
             const s = document.getElementById('task-board-name');
@@ -787,27 +938,24 @@ class App {
         document.getElementById('task-friend-select').value = '';
     }
     removeMemberFromCurrentTask(email) {
-        this.currentTaskMembers = this.currentTaskMembers.filter(m => m !== email);
+        this.currentTaskMembers = this.currentTaskMembers.filter(function(e) { return e !== email; });
         this.renderTaskTaggedMembers();
     }
     renderTaskTaggedMembers() {
-        const c = document.getElementById('task-tagged-members-list');
-        if (!c) return;
-        c.innerHTML = this.currentTaskMembers.length ?
-            this.currentTaskMembers.map(e => `<div class="flex justify-between bg-white px-2 py-1 rounded border text-[10px]">
-                <span>${this.escapeHtml(e)}</span>
-                <button type="button" onclick="app.removeMemberFromCurrentTask('${e}')" class="text-red-600 font-bold">x</button></div>`).join('') :
-            '<div class="text-[10px] text-gray-500 italic">ยังไม่มีสมาชิก</div>';
+        var box = document.getElementById('task-tagged-members-list');
+        if (!box) return;
+        box.innerHTML = this.currentTaskMembers.map(function(e) {
+            return '<div class="flex justify-between text-xs"><span>' + this.escapeHtml(e) + '</span><button type="button" onclick="app.removeMemberFromCurrentTask(\'' + this.escapeHtml(e) + '\')">ลบ</button></div>';
+        }.bind(this)).join('');
     }
-
     handleTaskSubmit(e) {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         if (!this.currentUser) return;
         const taskId = document.getElementById('task-id').value;
         const title = document.getElementById('task-title').value.trim();
         if (!title) return;
-        const startDate = document.getElementById('task-start-date').value;
-        const dueDate = document.getElementById('task-due-date').value;
+        var startDate = document.getElementById('task-start-date').value;
+        var dueDate = document.getElementById('task-due-date').value;
         const priority = document.getElementById('task-priority').value;
         const status = document.getElementById('task-status').value;
         const type = document.getElementById('task-type').value;
@@ -837,9 +985,8 @@ class App {
         taskObj.scanFile = scanFile;
         taskObj.dailyPlans = (useAI && startDate && dueDate) ? AIScheduler.createDailyPlans(taskObj) : [];
         if (useAI && startDate && dueDate) this.showToast('AI กำลังจัดสรรวัน...', 'info');
-
         if (taskId) {
-            const idx = allTasks.findIndex(t => t.id === taskId);
+            const idx = allTasks.findIndex(function(t) { return t.id === taskId; });
             if (idx !== -1) {
                 taskObj.id = taskId;
                 taskObj.createdAt = allTasks[idx].createdAt;
@@ -850,7 +997,7 @@ class App {
             allTasks.push(taskObj);
             if (type === 'group' && this.currentTaskMembers.length) {
                 let inv = this.getInvitations();
-                this.currentTaskMembers.forEach(target => {
+                this.currentTaskMembers.forEach(function(target) {
                     if (target !== userEmail) inv.push({
                         id: 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
                         taskId: taskObj.id,
@@ -864,7 +1011,6 @@ class App {
                 this.saveInvitations(inv);
             }
         }
-
         let pulled = false;
         if (status === 'done' && dueDate) {
             const today = new Date();
@@ -872,56 +1018,54 @@ class App {
             const due = new Date(dueDate);
             due.setHours(0, 0, 0, 0);
             if (today < due) {
-                const next = allTasks.filter(t => t.id !== taskObj.id && t.status !== 'done' && (t.startDate || t.dueDate));
+                const next = allTasks.filter(function(t) { return t.id !== taskObj.id && t.status !== 'done' && (t.startDate || t.dueDate); });
                 if (next.length) {
                     const daysEarly = Math.round((due - today) / 86400000);
-                    if (confirm(`งานนี้เสร็จก่อนกำหนด ~${daysEarly} วัน\n\nเลื่อนตารางงานถัดไปขึ้นไหม?\nตกลง = เลื่อนขึ้น | ยกเลิก = คงเดิม`)) {
+                    if (confirm('งานนี้เสร็จก่อนกำหนด ~' + daysEarly + ' วัน\n\nเลื่อนตารางงานถัดไปขึ้นไหม?\nตกลง = เลื่อนขึ้น | ยกเลิก = คงเดิม')) {
                         allTasks = this.pullUpNextTasks(taskObj, allTasks, daysEarly);
                         pulled = true;
                     }
                 }
             }
         }
-
         this.pendingScanText = '';
         this.pendingScanUrl = '';
         this.pendingScanFile = '';
         this.saveTasks(allTasks);
+        if (type === 'group' && boardName) this.ensureGroupBoard(boardName);
+        this.updateGroupSelectOptions();
         this.closeTaskModal();
         this.renderKanban();
         this.renderCalendar();
         this.showToast(pulled ? 'เลื่อนตารางงานถัดไปแล้ว' : (taskId ? 'แก้ไขเรียบร้อย' : 'เพิ่มงานสำเร็จ'), 'success');
     }
-
     pullUpNextTasks(completed, allTasks, daysEarly) {
         if (!daysEarly || daysEarly <= 0) return allTasks;
-        const shift = (d) => {
+        const shift = function(d) {
             if (!d) return d;
             const x = new Date(d);
             x.setDate(x.getDate() - daysEarly);
             return x.toISOString().slice(0, 10);
         };
-        return allTasks.map(t => {
+        return allTasks.map(function(t) {
             if (t.id === completed.id || t.status === 'done' || !(t.startDate || t.dueDate)) return t;
-            const u = {...t };
+            const u = Object.assign({}, t);
             if (u.startDate) u.startDate = shift(u.startDate);
             if (u.dueDate) u.dueDate = shift(u.dueDate);
             if (u.dailyPlans && u.dailyPlans.length) u.dailyPlans = u.dailyPlans.map(function(p) { return Object.assign({}, p, { date: shift(p.date) }); });
             return u;
         });
     }
-
     deleteTask(id) {
         if (!confirm('ลบงานนี้?')) return;
         const tid = id || document.getElementById('task-id').value;
         if (!tid) return;
-        this.saveTasks(this.getTasks().filter(t => t.id !== tid));
+        this.saveTasks(this.getTasks().filter(function(t) { return t.id !== tid; }));
         this.closeTaskModal();
         this.renderKanban();
         this.renderCalendar();
         this.showToast('ลบงานแล้ว', 'info');
     }
-
     handleImageOCRAndLocation(e) {
         var file = e.target.files && e.target.files[0];
         if (!file) return;
@@ -933,10 +1077,7 @@ class App {
     }
     scanPdfFile(file) {
         var self = this;
-        if (typeof pdfjsLib === 'undefined') {
-            this.showToast('ยังไม่ได้โหลดตัวอ่าน PDF', 'error');
-            return;
-        }
+        if (typeof pdfjsLib === 'undefined') return this.showToast('ยังไม่ได้โหลดตัวอ่าน PDF', 'error');
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         this.showToast('กำลังดึงข้อความจาก PDF...', 'info');
         var reader = new FileReader();
@@ -963,36 +1104,26 @@ class App {
                     self.fillScanResult(titleEl ? titleEl.value : firstLine, 'ดึงข้อความจาก PDF ได้ ' + maxPages + ' หน้า', text.slice(0, 400));
                     self.showToast('ดึงข้อความจาก PDF สำเร็จ', 'success');
                 });
-            }).catch(function() {
-                self.showToast('อ่าน PDF ไม่สำเร็จ', 'error');
-            });
+            }).catch(function() { self.showToast('อ่าน PDF ไม่สำเร็จ', 'error'); });
         };
         reader.readAsArrayBuffer(file);
     }
-
     ocrPdfPages(pdf, file) {
         var self = this;
-        if (typeof Tesseract === 'undefined') {
-            this.showToast('ยังไม่ได้โหลดตัว OCR', 'error');
-            return;
-        }
+        if (typeof Tesseract === 'undefined') return this.showToast('ยังไม่ได้โหลดตัว OCR', 'error');
         var maxPages = Math.min(pdf.numPages, 2);
         var chain = Promise.resolve('');
         for (var i = 1; i <= maxPages; i++) {
             (function(pageNo) {
                 chain = chain.then(function(acc) {
                     return pdf.getPage(pageNo).then(function(page) {
-                        var viewport = page.getViewport({ scale: 1.6 });
+                        var vp = page.getViewport({ scale: 1.3 });
                         var canvas = document.createElement('canvas');
-                        canvas.width = viewport.width;
-                        canvas.height = viewport.height;
-                        return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise.then(function() {
-                            return Tesseract.recognize(canvas, 'tha+eng', {
-                                logger: function(m) {
-                                    if (m.status === 'recognizing text') self.showToast('OCR หน้า ' + pageNo + ' ' + Math.round((m.progress || 0) * 100) + '%', 'info');
-                                }
-                            }).then(function(res) {
-                                return (acc + ' ' + (res.data.text || '')).trim();
+                        canvas.width = vp.width;
+                        canvas.height = vp.height;
+                        return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise.then(function() {
+                            return Tesseract.recognize(canvas, 'tha+eng').then(function(res) {
+                                return acc + ' ' + ((res && res.data && res.data.text) || '');
                             });
                         });
                     });
@@ -1001,140 +1132,75 @@ class App {
         }
         chain.then(function(text) {
             text = String(text || '').replace(/\s+/g, ' ').trim();
-            if (!text) {
-                self.showToast('OCR ไม่พบตัวอักษรในภาพ', 'warning');
-                self.fillScanResult('งานสแกน: ' + file.name.replace(/\.pdf$/i, ''), 'OCR ไม่พบข้อความ', file.name);
-                return;
-            }
             var titleEl = document.getElementById('task-title');
-            var firstLine = text.slice(0, 80);
-            if (titleEl && !titleEl.value) titleEl.value = firstLine;
-            self.fillScanResult(firstLine, 'OCR จาก PDF ภาพได้ ' + maxPages + ' หน้า', text.slice(0, 400));
+            if (titleEl && !titleEl.value) titleEl.value = (text || file.name).slice(0, 80);
+            self.fillScanResult(titleEl ? titleEl.value : file.name, 'OCR จาก PDF', text.slice(0, 400));
             self.showToast('OCR สำเร็จ', 'success');
-        }).catch(function() {
-            self.showToast('OCR ไม่สำเร็จ', 'error');
-        });
-    }
-    fillScanResult(title, descText, infoText) {
-        var titleEl = document.getElementById('task-title');
-        var priority = document.getElementById('task-priority');
-        if (titleEl && !titleEl.value) titleEl.value = title;
-        if (priority) priority.value = 'high';
-        this.pendingScanText = infoText || descText || '';
-        var desc = document.getElementById('ocr-desc');
-        var info = document.getElementById('ocr-location-info');
-        var prev = document.getElementById('ocr-result-preview');
-        if (desc) desc.innerText = descText;
-        if (info) info.innerText = infoText;
-        if (prev) prev.classList.remove('hidden');
+        }).catch(function() { self.showToast('OCR ไม่สำเร็จ', 'error'); });
     }
     scanFromUrl() {
-        var input = document.getElementById('task-scan-url');
-        var raw = input ? String(input.value || '').trim() : '';
-        if (!raw) return this.showToast('วางลิงก์ก่อน', 'warning');
-        this.pendingScanUrl = raw;
-        var title = document.getElementById('task-title');
-        var clean = raw.split('?')[0].split('/').filter(Boolean).pop() || raw;
-        try { clean = decodeURIComponent(clean); } catch (err) {}
-        clean = clean.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ');
-        if (title && !title.value) title.value = 'งานจากลิงก์: ' + clean;
-        var desc = document.getElementById('ocr-desc');
-        var info = document.getElementById('ocr-location-info');
+        var urlEl = document.getElementById('task-scan-url');
+        var url = urlEl ? urlEl.value.trim() : '';
+        if (!url) return this.showToast('วางลิงก์ก่อน', 'warning');
+        this.pendingScanUrl = url;
+        var titleEl = document.getElementById('task-title');
+        if (titleEl && !titleEl.value) titleEl.value = url.replace(/^https?:\/\//, '').slice(0, 80);
+        this.fillScanResult(titleEl ? titleEl.value : url, 'บันทึกลิงก์แล้ว', url);
+        this.showToast('บันทึกลิงก์แล้ว', 'success');
+    }
+    fillScanResult(title, desc, extra) {
+        this.pendingScanText = extra || desc || '';
         var prev = document.getElementById('ocr-result-preview');
-        if (desc) desc.innerText = 'อ่านลิงก์สำเร็จ';
-        if (info) info.innerText = raw;
+        var d = document.getElementById('ocr-desc');
+        var loc = document.getElementById('ocr-location-info');
         if (prev) prev.classList.remove('hidden');
-        this.showToast('สแกนลิงก์สำเร็จ', 'success');
+        if (d) d.innerText = desc || '';
+        if (loc) loc.innerText = extra || '';
+        var titleEl = document.getElementById('task-title');
+        if (titleEl && !titleEl.value && title) titleEl.value = title;
     }
-
     renderCalendar() {
-        const grid = document.getElementById('calendar-days-grid'),
-            title = document.getElementById('calendar-month-year');
+        var grid = document.getElementById('calendar-days-grid');
+        var title = document.getElementById('calendar-month-title');
         if (!grid || !title || !this.currentUser) return;
-        grid.innerHTML = '';
-        const y = this.currentCalendarDate.getFullYear(),
-            m = this.currentCalendarDate.getMonth();
-        const names = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-        title.innerText = names[m] + ' ' + (y + 543);
-        const first = new Date(y, m, 1).getDay(),
-            days = new Date(y, m + 1, 0).getDate();
-        for (let i = 0; i < first; i++) {
-            const e = document.createElement('div');
-            e.className = 'h-24 rounded-xl bg-white/25 border border-white/30';
-            grid.appendChild(e);
-        }
-        const userEmail = this.currentUser.email;
-        const tasks = this.getTasks().filter(function(t) {
-            return t.userEmail === userEmail || (t.taggedEmails || []).indexOf(userEmail) !== -1;
-        });
-        const clean = function(v) {
-            var s = String(v || '').trim();
-            var m1 = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-            if (m1) return m1[1] + '-' + String(m1[2]).padStart(2, '0') + '-' + String(m1[3]).padStart(2, '0');
-            return s.slice(0, 10);
-        };
-        const self = this;
-        var shown = 0;
-        for (let d = 1; d <= days; d++) {
-            const cell = document.createElement('div');
-            cell.className = 'h-24 bg-white/45 p-2 rounded-xl border border-white/50 overflow-y-auto space-y-1';
-            const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-            cell.innerHTML = '<div class="text-xs font-bold text-[#1f3627] mb-1">' + d + '</div>';
-            tasks.forEach(function(t) {
-                var start = clean(t.startDate) || clean(t.dueDate);
-                var due = clean(t.dueDate) || clean(t.startDate);
-                if (start && due && start > due) {
-                    var tmp = start;
-                    start = due;
-                    due = tmp;
-                }
-                var planHit = (t.dailyPlans || []).find(function(p) { return clean(p.date) === ds; });
-                if (!(start && due && ds >= start && ds <= due) && !planHit) return;
-                shown++;
-                const el = document.createElement('div');
-                el.className = 'text-[9px] bg-[#385441] text-white px-1.5 py-0.5 rounded truncate cursor-pointer';
-                el.innerText = (planHit && planHit.description) ? planHit.description : t.title;
-                el.onclick = function(ev) {
-                    ev.stopPropagation();
-                    self.openEditTaskModal(t.id);
-                };
-                cell.appendChild(el);
-            });
-            grid.appendChild(cell);
-        }
-        var note = document.getElementById('calendar-miss-note');
-        if (!note) {
-            note = document.createElement('div');
-            note.id = 'calendar-miss-note';
-            note.className = 'text-[11px] text-[#1f3627] bg-white/70 rounded-xl p-2';
-            grid.parentNode.appendChild(note);
-        }
-        if (!tasks.length) note.innerText = 'ยังไม่มีงานในบัญชีนี้';
-        else if (!shown) {
-            note.innerText = 'เดือนนี้ไม่มีงาน งานที่มีอยู่: ' + tasks.map(function(t) {
-                return t.title + ' (' + (clean(t.dueDate) || clean(t.startDate) || 'ไม่ได้ใส่วันที่') + ')';
-            }).join(' | ');
-        } else note.innerText = '';
-    }
-    changeMonth(off) {
-        this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + off);
-        this.renderCalendar();
-    }
-    goToday() {
-        this.currentCalendarDate = new Date();
-        this.renderCalendar();
-    }
+        var date = this.currentCalendarDate;
+        var y = date.getFullYear(),
+            m = date.getMonth();
+        title.innerText = 'เดือน ' + (m + 1) + ' ปี ' + (y + 543);
+        var first = new Date(y, m, 1);
+        var startPad = first.getDay();
+        var days = new Date(y, m + 1, 0).getDate();
+        var tasks = this.getTasks();
+        var html = '';
+        for (var i = 0; i < startPad; i++) html += '<div></div>';
+        var self = this;
 
+        function clean(d) { return d ? String(d).slice(0, 10) : ''; }
+        for (var day = 1; day <= days; day++) {
+            var ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            var dayTasks = tasks.filter(function(t) {
+                var a = clean(t.startDate),
+                    b = clean(t.dueDate) || a;
+                if (!a && !b) return false;
+                if (!a) a = b;
+                if (!b) b = a;
+                return ds >= a && ds <= b;
+            });
+            html += '<div class="min-h-[72px] bg-white/70 rounded-xl p-1 border border-[#c0b59f]/50">' +
+                '<div class="text-[10px] font-bold text-[#1f3627]">' + day + '</div>' +
+                dayTasks.map(function(t) { return '<div class="text-[9px] truncate text-[#385441]">' + self.escapeHtml(t.title) + '</div>'; }).join('') +
+                '</div>';
+        }
+        grid.innerHTML = html;
+    }
+    prevMonth() { this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() - 1);
+        this.renderCalendar(); }
+    nextMonth() { this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + 1);
+        this.renderCalendar(); }
     setTimerMode(mode) {
-        this.timerMode = mode;
         this.stopTimer();
-        if (mode === 'elapsed') this.timerTimeLeft = 0;
-        else this.timerTimeLeft = this.getTimerSeconds(mode);
-        ['work', 'short', 'long', 'elapsed'].forEach(function(m) {
-            var btn = document.getElementById('btn-pomo-' + m);
-            var key = m === 'short' ? 'shortBreak' : m === 'long' ? 'longBreak' : m;
-            if (btn) btn.className = mode === key ? 'px-3 py-1 bg-[#385441] text-white rounded-lg text-xs font-bold' : 'px-3 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs font-bold';
-        });
+        this.timerMode = mode;
+        this.timerTimeLeft = mode === 'elapsed' ? 0 : this.getTimerSeconds(mode);
         this.updateTimerDisplay();
     }
     getTimerSeconds(mode) {
@@ -1189,19 +1255,19 @@ class App {
         var label = document.getElementById('pomo-mode-label');
         if (label) label.innerText = this.timerMode === 'elapsed' ? 'ทำงานไปแล้ว' : 'เหลือเวลา';
     }
-
     escapeHtml(str) {
         if (!str) return '';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-    showToast(msg, type = 'info') {
+    showToast(msg, type) {
+        type = type || 'info';
         const t = document.getElementById('toast');
         if (!t) return;
         const colors = { success: 'bg-[#385441] text-white', warning: 'bg-amber-600 text-white', info: 'bg-[#2d4735] text-white', error: 'bg-red-700 text-white' };
-        t.className = `fixed bottom-5 right-5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium z-50 ${colors[type] || colors.info}`;
+        t.className = 'fixed bottom-5 right-5 px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium z-50 ' + (colors[type] || colors.info);
         t.innerText = msg;
         t.classList.remove('hidden');
-        setTimeout(() => t.classList.add('hidden'), 3000);
+        setTimeout(function() { t.classList.add('hidden'); }, 3000);
     }
 }
 
